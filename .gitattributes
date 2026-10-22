@@ -1,2 +1,5 @@
 /mvnw text eol=lf
 *.cmd text eol=crlf
+
+# PostgreSQL initialization scripts
+/docker/postgres/init/*.sh text eol=lf
