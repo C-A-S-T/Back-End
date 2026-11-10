@@ -13,7 +13,7 @@ import java.time.ZoneOffset;
 
 @Getter
 @Entity
-@Table(name = "research_task")
+@Table(schema = "backend", name = "research_task")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ResearchTask extends BaseTimeEntity {
 

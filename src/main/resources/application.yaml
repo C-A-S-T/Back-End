@@ -5,3 +5,13 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+  flyway:
+    default-schema: public
+    schemas: public
+
+cast:
+  ai:
+    enabled: ${CAST_AI_ENABLED:false}
+    base-url: ${CAST_AI_BASE_URL:}
+    api-token: ${CAST_AI_API_TOKEN:}
+    callback-token: ${CAST_AI_CALLBACK_TOKEN:}

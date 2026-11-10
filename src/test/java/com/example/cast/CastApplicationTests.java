@@ -7,5 +7,15 @@ import org.springframework.test.context.ActiveProfiles;
 @SpringBootTest
 @ActiveProfiles("test")
 class CastApplicationTests extends TestDatabaseSupport {
-    @Test void contextLoads() {}
+    @org.springframework.beans.factory.annotation.Autowired
+    com.example.cast.integration.ai.config.AiProperties ai;
+    @org.springframework.beans.factory.annotation.Autowired
+    org.springframework.context.ApplicationContext context;
+    @Test void contextLoads() {
+        org.junit.jupiter.api.Assertions.assertFalse(ai.enabled());
+        org.junit.jupiter.api.Assertions.assertTrue(ai.apiToken().isEmpty());
+        org.junit.jupiter.api.Assertions.assertTrue(ai.callbackToken().isEmpty());
+        org.junit.jupiter.api.Assertions.assertTrue(context.getBeansOfType(
+                com.example.cast.integration.ai.service.AiJobDispatcher.class).isEmpty());
+    }
 }

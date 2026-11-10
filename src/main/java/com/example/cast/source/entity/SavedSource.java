@@ -12,8 +12,7 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(
-        name = "saved_source",
+@Table(schema = "backend", name = "saved_source",
         uniqueConstraints = @UniqueConstraint(
                 name = "uq_saved_source_user_document",
                 columnNames = {"user_id", "document_id"}

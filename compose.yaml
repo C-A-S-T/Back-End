@@ -11,8 +11,9 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?required}
       POSTGRES_DB: cast_dev
 
-      CAST_DB_USER: cast_app
       CAST_DB_PASSWORD: ${CAST_DB_PASSWORD:?required}
+      CAST_AI_DB_PASSWORD: ${CAST_AI_DB_PASSWORD:?required}
+      CAST_MIGRATION_DB_PASSWORD: ${CAST_MIGRATION_DB_PASSWORD:?required}
 
     volumes:
       - cast_postgres_data:/var/lib/postgresql/data

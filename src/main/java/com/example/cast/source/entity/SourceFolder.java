@@ -10,8 +10,7 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(
-        name = "source_folder",
+@Table(schema = "backend", name = "source_folder",
         uniqueConstraints = {
                 @UniqueConstraint(
                         name = "uq_source_folder_user_name",

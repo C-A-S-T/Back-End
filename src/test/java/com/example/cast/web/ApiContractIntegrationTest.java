@@ -20,7 +20,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 /** 테스트 전용 컨트롤러로 필터부터 예외 처리까지 실제 HTTP 계약을 검증한다. */
-@SpringBootTest
+@SpringBootTest(properties = "cast.ai.callback-token=callback-test-token-at-least-32-characters")
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
 @Import(ApiContractIntegrationTest.ProbeController.class)
@@ -46,7 +46,7 @@ class ApiContractIntegrationTest extends TestDatabaseSupport {
     }
     @Test void browserKeepsLoginRedirect() throws Exception {
         mvc.perform(get("/test-contract/business").accept(MediaType.TEXT_HTML))
-                .andExpect(status().isFound()).andExpect(redirectedUrlPattern("**/login"));
+                .andExpect(status().isFound()).andExpect(redirectedUrl("/login"));
     }
     @Test void badBasicCredentialsGetCommon401() throws Exception {
         mvc.perform(get("/test-contract/business").with(httpBasic("invalid", "invalid")))
@@ -92,5 +92,54 @@ class ApiContractIntegrationTest extends TestDatabaseSupport {
     }
     @Test void healthRemainsPublic() throws Exception {
         mvc.perform(get("/actuator/health")).andExpect(status().isOk());
+    }
+
+    private static final String CALLBACK_TOKEN = "callback-test-token-at-least-32-characters";
+    @Autowired com.example.cast.integration.ai.service.AiJobService aiJobs;
+    @Autowired jakarta.persistence.EntityManager em;
+    @Autowired org.springframework.transaction.PlatformTransactionManager transactions;
+    private com.example.cast.integration.ai.dto.AiJobRequest prepareJob() {
+        Long taskId = new org.springframework.transaction.support.TransactionTemplate(transactions).execute(tx -> {
+            var user = new com.example.cast.user.entity.User(java.util.UUID.randomUUID()+"@example.invalid", "hash"); em.persist(user);
+            var query = new com.example.cast.research.entity.ResearchQuery(user, "question"); em.persist(query);
+            var task = new com.example.cast.research.entity.ResearchTask(query); em.persist(task); return task.getTaskId();
+        });
+        return aiJobs.enqueue(taskId);
+    }
+    @Test void userLoginCannotImpersonateAiService() throws Exception {
+        mvc.perform(post("/internal/ai/research-tasks/1/result").with(user("tester").roles("AI_SERVER"))
+                .with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.result.code").value(401));
+    }
+    @Test void wrongAiTokenRejected() throws Exception {
+        mvc.perform(post("/internal/ai/research-tasks/1/result").header("X-AI-Service-Token", "wrong")
+                .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isUnauthorized());
+    }
+    @Test void authenticatedAiPayloadIsValidated() throws Exception {
+        mvc.perform(post("/internal/ai/research-tasks/1/result").header("X-AI-Service-Token", CALLBACK_TOKEN)
+                .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.result.code").value(400));
+    }
+    @Test void authenticatedCallbackSucceedsWithoutCsrfAndCanBeRetried() throws Exception {
+        var job=prepareJob();
+        String json="""
+            {"jobId":"%s","outcome":"SUCCESS","answer":"answer","summary":"summary","claims":[]}
+            """.formatted(job.jobId());
+        for(int attempt=0;attempt<2;attempt++) {
+            mvc.perform(post("/internal/ai/research-tasks/"+job.taskId()+"/result")
+                    .header("X-AI-Service-Token", CALLBACK_TOKEN).contentType(MediaType.APPLICATION_JSON).content(json))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("COMPLETED"))
+                    .andExpect(jsonPath("$.data.answerId").isNumber());
+        }
+    }
+    @Test void callbackWithWrongCorrelationIdReturnsConflict() throws Exception {
+        var job=prepareJob();
+        String json="""
+            {"jobId":"%s","outcome":"SUCCESS","answer":"answer","claims":[]}
+            """.formatted(java.util.UUID.randomUUID());
+        mvc.perform(post("/internal/ai/research-tasks/"+job.taskId()+"/result")
+                .header("X-AI-Service-Token", CALLBACK_TOKEN).contentType(MediaType.APPLICATION_JSON).content(json))
+                .andExpect(status().isConflict());
     }
 }
