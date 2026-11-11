@@ -20,7 +20,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 /** 테스트 전용 컨트롤러로 필터부터 예외 처리까지 실제 HTTP 계약을 검증한다. */
-@SpringBootTest(properties = "cast.ai.callback-token=callback-test-token-at-least-32-characters")
+@SpringBootTest
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
 @Import(ApiContractIntegrationTest.ProbeController.class)
@@ -94,7 +94,7 @@ class ApiContractIntegrationTest extends TestDatabaseSupport {
         mvc.perform(get("/actuator/health")).andExpect(status().isOk());
     }
 
-    private static final String CALLBACK_TOKEN = "callback-test-token-at-least-32-characters";
+    private static final String CALLBACK_TOKEN = TEST_CALLBACK_TOKEN;
     @Autowired com.example.cast.integration.ai.service.AiJobService aiJobs;
     @Autowired jakarta.persistence.EntityManager em;
     @Autowired org.springframework.transaction.PlatformTransactionManager transactions;

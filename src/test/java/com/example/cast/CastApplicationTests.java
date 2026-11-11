@@ -14,7 +14,7 @@ class CastApplicationTests extends TestDatabaseSupport {
     @Test void contextLoads() {
         org.junit.jupiter.api.Assertions.assertFalse(ai.enabled());
         org.junit.jupiter.api.Assertions.assertTrue(ai.apiToken().isEmpty());
-        org.junit.jupiter.api.Assertions.assertTrue(ai.callbackToken().isEmpty());
+        org.junit.jupiter.api.Assertions.assertEquals(TEST_CALLBACK_TOKEN, ai.callbackToken());
         org.junit.jupiter.api.Assertions.assertTrue(context.getBeansOfType(
                 com.example.cast.integration.ai.service.AiJobDispatcher.class).isEmpty());
     }

@@ -9,6 +9,17 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 /** 실제 런타임 제한 계정과 Flyway 소유자 계정을 분리해 검증한다. */
 @Import(TestDatabaseSupport.DatabaseConfig.class)
 public abstract class TestDatabaseSupport {
+    protected static final String TEST_CALLBACK_TOKEN = "callback-test-token-at-least-32-characters";
+
+    /** 환경변수보다 우선하는 테스트 설정으로 실제 AI 서버 연결을 차단한다. */
+    @org.springframework.test.context.DynamicPropertySource
+    static void isolateAiConnection(org.springframework.test.context.DynamicPropertyRegistry registry) {
+        registry.add("cast.ai.enabled", () -> false);
+        registry.add("cast.ai.base-url", () -> "");
+        registry.add("cast.ai.api-token", () -> "");
+        registry.add("cast.ai.callback-token", () -> TEST_CALLBACK_TOKEN);
+    }
+
     @Autowired protected PostgreSQLContainer postgres;
     @TestConfiguration(proxyBeanMethods = false)
     public static class DatabaseConfig {

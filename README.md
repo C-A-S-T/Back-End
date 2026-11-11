@@ -96,7 +96,8 @@ AI 통신은 기본적으로 꺼져 있다. 실제 AI 서버를 연결할 때 �
 
 테스트 실행 승인을 받은 환경에서 `CAST_PERSISTENCE_TEST_APPROVED=YES`를 설정하고 `.\mvnw.cmd test`를 실행한다.
 테스트는 임시 PostgreSQL만 사용하고 기존 DB/볼륨에 연결하지 않는다.
-`test` 프로필은 개발 환경의 AI 연결 설정을 덮어써 외부 AI 서버로 테스트 작업을 전송하지 않는다.
+공통 테스트의 `@DynamicPropertySource`는 환경변수보다 우선하여 AI 전송을 끄고 테스트 전용 콜백 토큰을 사용한다.
+`test` 프로필의 YAML만으로는 환경변수를 덮어쓸 수 없으므로 이 설정을 함께 유지한다.
 Flyway는 실제 `cast_migrator`, JPA는 `cast_app`, AI SQL 검증은 `cast_ai`로 실행한다.
 
 검증 범위:
