@@ -18,6 +18,10 @@ public abstract class TestDatabaseSupport {
         registry.add("cast.ai.base-url", () -> "");
         registry.add("cast.ai.api-token", () -> "");
         registry.add("cast.ai.callback-token", () -> TEST_CALLBACK_TOKEN);
+        // 테스트에서만 쓰는 키. 실행 환경의 실제 JWT 키를 사용하지 않는다.
+        registry.add("cast.jwt.secret-base64", () -> java.util.Base64.getEncoder().encodeToString(
+                "cast-auth-test-only-key-32-bytes!!".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        registry.add("cast.cors.allowed-origins", () -> "http://localhost:5173");
     }
 
     @Autowired protected PostgreSQLContainer postgres;

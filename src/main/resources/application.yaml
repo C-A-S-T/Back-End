@@ -10,6 +10,10 @@ spring:
     schemas: public
 
 cast:
+  jwt:
+    secret-base64: ${CAST_JWT_SECRET_BASE64:}
+  cors:
+    allowed-origins: ${CAST_CORS_ALLOWED_ORIGINS:http://localhost:5173}
   ai:
     enabled: ${CAST_AI_ENABLED:false}
     base-url: ${CAST_AI_BASE_URL:}

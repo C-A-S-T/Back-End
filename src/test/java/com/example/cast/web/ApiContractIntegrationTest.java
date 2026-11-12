@@ -26,6 +26,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import(ApiContractIntegrationTest.ProbeController.class)
 class ApiContractIntegrationTest extends TestDatabaseSupport {
     @Autowired MockMvc mvc;
+    @Autowired com.example.cast.auth.service.AuthService auth;
+    private String bearer() {
+        return "Bearer " + auth.signup(new com.example.cast.auth.dto.request.SignupRequest(
+                java.util.UUID.randomUUID() + "@example.invalid", "ContractPassword123!")).accessToken();
+    }
     @org.springframework.boot.test.context.TestComponent
     @RestController
     static class ProbeController {
@@ -44,49 +49,50 @@ class ApiContractIntegrationTest extends TestDatabaseSupport {
                 .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.result.code").value(401))
                 .andExpect(jsonPath("$.result.success").value(false));
     }
-    @Test void browserKeepsLoginRedirect() throws Exception {
+    @Test void browserAlsoGetsJson401() throws Exception {
         mvc.perform(get("/test-contract/business").accept(MediaType.TEXT_HTML))
-                .andExpect(status().isFound()).andExpect(redirectedUrl("/login"));
+                .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.result.code").value(401))
+                .andExpect(header().doesNotExist("Location"));
     }
     @Test void badBasicCredentialsGetCommon401() throws Exception {
         mvc.perform(get("/test-contract/business").with(httpBasic("invalid", "invalid")))
                 .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.result.code").value(401));
     }
-    @Test void missingCsrfGetsCommon403() throws Exception {
-        mvc.perform(post("/test-contract/input").with(user("tester"))
+    @Test void bearerPostDoesNotRequireCsrf() throws Exception {
+        mvc.perform(post("/test-contract/input").header("Authorization", bearer())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"title\":\"value\"}"))
-                .andExpect(status().isForbidden()).andExpect(jsonPath("$.result.code").value(403));
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.result.code").value(201));
     }
     @Test void validInputGetsCommonSuccess() throws Exception {
-        mvc.perform(post("/test-contract/input").with(user("tester")).with(csrf())
+        mvc.perform(post("/test-contract/input").header("Authorization", bearer())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"title\":\"value\"}"))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.result.code").value(201))
                 .andExpect(jsonPath("$.data.title").value("value"));
     }
     @Test void invalidInputGetsCommon400() throws Exception {
-        mvc.perform(post("/test-contract/input").with(user("tester")).with(csrf())
+        mvc.perform(post("/test-contract/input").header("Authorization", bearer())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"title\":\" \"}"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.result.code").value(400));
     }
     @Test void malformedJsonGetsCommon400() throws Exception {
-        mvc.perform(post("/test-contract/input").with(user("tester")).with(csrf())
+        mvc.perform(post("/test-contract/input").header("Authorization", bearer())
                 .contentType(MediaType.APPLICATION_JSON).content("{"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.result.code").value(400));
     }
     @Test void missingRouteGetsCommon404() throws Exception {
-        mvc.perform(get("/test-contract/missing").with(user("tester")))
+        mvc.perform(get("/test-contract/missing").header("Authorization", bearer()))
                 .andExpect(status().isNotFound()).andExpect(jsonPath("$.result.code").value(404));
     }
     @Test void wrongMethodGetsCommon405() throws Exception {
-        mvc.perform(get("/test-contract/input").with(user("tester")))
+        mvc.perform(get("/test-contract/input").header("Authorization", bearer()))
                 .andExpect(status().isMethodNotAllowed()).andExpect(jsonPath("$.result.code").value(405));
     }
     @Test void businessFailureGetsCommon409() throws Exception {
-        mvc.perform(get("/test-contract/business").with(user("tester")))
+        mvc.perform(get("/test-contract/business").header("Authorization", bearer()))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.result.code").value(409));
     }
     @Test void internalFailureIsRedacted() throws Exception {
-        mvc.perform(get("/test-contract/failure").with(user("tester")))
+        mvc.perform(get("/test-contract/failure").header("Authorization", bearer()))
                 .andExpect(status().isInternalServerError()).andExpect(jsonPath("$.result.code").value(500))
                 .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("internal-secret"))));
     }
