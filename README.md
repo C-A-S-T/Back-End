@@ -123,7 +123,8 @@ HS256 서명, issuer `cast-api`, subject `userId`, `iat`/`exp`를 사용하며 �
 Spring Security OAuth2 Resource Server가 서명과 클레임을 검증하고 매 보호 요청마다 현재 DB 사용자의 존재/ACTIVE 상태를 확인한다.
 일반 API는 `Authorization: Bearer <accessToken>`으로 호출한다. 세션, HTTP Basic, 폼 로그인은 사용하지 않는다.
 쿠키 인증을 사용하지 않으므로 일반 API의 CSRF 검사를 끄며, JWT를 쿼리 파라미터에서 받지 않는다.
-공개 경로는 두 인증 POST와 `GET /actuator/health`뿐이다. `/internal/ai/**`는 기존 별도 인증 체인을 유지한다.
+공개 업무 경로는 두 인증 POST와 `GET /actuator/health`이며 Swagger UI/명세 GET 경로도 인증 없이 접근한다.
+`/internal/ai/**`는 기존 별도 인증 체인을 유지한다.
 
 이후 출처보관함 등 사용자별 API에서 다음처럼 검증된 사용자 ID를 받아 소유권을 검사한다.
 요청 본문/쿼리의 `userId`를 로그인 사용자로 신뢰하지 않는다.
@@ -164,6 +165,36 @@ $env:CAST_CORS_ALLOWED_ORIGINS = 'http://localhost:5173'
 예: `https://cast.example.com,https://admin.cast.example.com`. 와일드카드, 경로, 마지막 `/`는 허용하지 않는다.
 Spring 실행은 `.env`를 자동으로 읽지 않으므로 `.env.example`만 채워서는 적용되지 않는다.
 
+## Swagger로 회원가입·로그인 확인
+
+Spring 백엔드를 실행한 뒤 다음 주소에서 확인한다. 별도 프론트엔드 서버(5173)는 필요하지 않다.
+
+- Swagger UI: <http://localhost:8080/swagger-ui/index.html> (`/swagger-ui.html`도 사용 가능)
+- OpenAPI JSON: <http://localhost:8080/v3/api-docs>
+
+`local` 프로필에서는 기존 DB와 JWT 환경변수를 준비한 뒤 같은 PowerShell 창에서 실행한다.
+앱 시작 시 미적용 Flyway 마이그레이션이 실행될 수 있다.
+
+```powershell
+cd C:\Development\Spring\cast\cast
+$env:SPRING_PROFILES_ACTIVE = 'local'
+.\mvnw.cmd spring-boot:run
+```
+
+1. `Auth` → `POST /api/v1/auth/signup` → **Try it out**을 누른다.
+2. 사용하지 않은 이메일과 조건에 맞는 비밀번호를 입력하고 **Execute**를 누른다. 실제 연결 DB에 회원이 저장된다.
+3. 201 응답의 `data.accessToken`과 `expiresIn: 3600`을 확인한다.
+4. `POST /api/v1/auth/login`에서 같은 이메일·비밀번호로 실행하여 200 응답을 확인한다.
+
+두 인증 API는 **Authorize 없이** 사용할 수 있다. 이후 보호 API를 문서에 추가하면 Authorize에
+`Bearer ` 접두사 없이 Access Token 값만 입력한다. 브라우저 새로고침 후 인증 정보는 유지하지 않는다.
+현재 문서 대상은 `/api/v1/auth/**`이며 AI 내부 API와 테스트용 API는 노출하지 않는다.
+
+링큐의 [SwaggerConfig](https://github.com/LinkYou-2025/LinkU_backend/blob/develop/src/main/java/com/umc/linkyou/config/swagger/SwaggerConfig.java)와
+[AuthApi](https://github.com/LinkYou-2025/LinkU_backend/blob/develop/src/main/java/com/umc/linkyou/web/api/AuthApi.java)를 참고해
+상대 서버 URL, JWT Bearer 스키마, 문서 인터페이스 분리, 공통 응답 예시를 적용했다.
+CAST에서는 표준 OpenAPI 어노테이션을 사용하고, Boot 4.1에 맞춰 springdoc 3.2.0을 사용한다.
+
 ## 테스트
 
 테스트 실행 승인을 받은 환경에서 `CAST_PERSISTENCE_TEST_APPROVED=YES`를 설정하고 `.\mvnw.cmd test`를 실행한다.
@@ -187,5 +218,6 @@ Flyway는 실제 `cast_migrator`, JPA는 `cast_app`, AI SQL 검증은 `cast_ai`�
 - 동시 가입 충돌과 이메일 UNIQUE/기타 무결성 오류의 구분
 - JWT 서명/만료/issuer/subject/필수 클레임, 계정 상태 변경, 존재하지 않는 사용자
 - 테스트 전용 API의 인증 principal/소유권, CORS, 세션/쿼리 토큰 거부, 키 설정 오류의 시작 거부
+- Swagger UI/명세의 공개 접근, 인증 API의 토큰 불필요 표시, 응답 스키마·예시와 실제 코드의 일치
 
 실제 AI 서버 소스와 모델 실행은 이 저장소에 없으므로 그 서버와의 실환경 통합 테스트는 별도다.

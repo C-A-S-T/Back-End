@@ -6,7 +6,6 @@ import com.example.cast.auth.dto.request.SignupRequest;
 import com.example.cast.auth.dto.response.AuthResponse;
 import com.example.cast.auth.service.AuthService;
 import com.example.cast.global.response.ApiResponse;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -15,16 +14,16 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
-public class AuthController {
+public class AuthController implements AuthApi {
     private final AuthService auth;
 
-    @PostMapping("/signup")
-    public ResponseEntity<ApiResponse<AuthResponse>> signup(@Valid @RequestBody SignupRequest request) {
+    @Override
+    public ResponseEntity<ApiResponse<AuthResponse>> signup(SignupRequest request) {
         return ApiResponse.success(AuthSuccessCode.SIGNUP_SUCCESS, auth.signup(request));
     }
 
-    @PostMapping("/login")
-    public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody LoginRequest request) {
+    @Override
+    public ResponseEntity<ApiResponse<AuthResponse>> login(LoginRequest request) {
         return ApiResponse.success(AuthSuccessCode.LOGIN_SUCCESS, auth.login(request));
     }
 }
