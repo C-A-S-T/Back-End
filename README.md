@@ -39,7 +39,7 @@ V1~V5는 변경하지 않았다. V6에서 기존 테이블을 이동하고 사�
 1. Docker 엔진을 실행한다.
 2. `.env.example`을 `.env`로 복사하고 관리자/백엔드/AI/마이그레이션 비밀번호를 각각 설정한다.
 3. `docker compose up -d`로 DB를 시작한다. 최초 초기화 스크립트가 역할과 권한을 준비한다.
-4. Spring 실행 환경에 `SPRING_PROFILES_ACTIVE=local`, `CAST_DB_PASSWORD`, `CAST_MIGRATION_DB_PASSWORD`를 설정한다.
+4. Spring 실행 환경에 `SPRING_PROFILES_ACTIVE=local`, `CAST_DB_PASSWORD`, `CAST_MIGRATION_DB_PASSWORD`, `CAST_JWT_SECRET_BASE64`를 설정한다. JWT 키 생성 방법은 아래 인증 항목을 참고한다.
 5. `.\mvnw.cmd spring-boot:run`으로 실행한다.
 
 Compose는 `.env`를 읽지만 Spring은 자동으로 읽지 않는다. 앱 환경변수는 IDE나 실행 프로세스에 별도로 설정한다.
@@ -87,16 +87,120 @@ AI 통신은 기본적으로 꺼져 있다. 실제 AI 서버를 연결할 때 �
 
 두 토큰은 별도 생성한다. 콜백 토큰이 비어 있으면 내부 AI API는 모든 요청을 거절한다.
 내부 통신은 배포 시 HTTPS 또는 신뢰된 사설망에서 제공한다. 토큰은 URL/로그에 기록하지 않는다.
-사용자용 폼 로그인/Basic/CSRF 정책과 health 공개 정책은 유지한다.
+사용자용 일반 API는 JWT Bearer 인증을 사용하며 `GET /actuator/health`는 공개한다.
 `/internal/ai/**`만 별도 무상태 서비스 인증을 사용하며 사용자 로그인으로 접근할 수 없다.
 
 상세 요청/응답 예시와 AI 구현 요구사항은 [AI 연동 계약](docs/ai-contract.md)을 참고한다.
+
+## 이메일 회원가입과 로그인
+
+| API | 입력 | 성공 응답 |
+| --- | --- | --- |
+| `POST /api/v1/auth/signup` | `email`, `password` | 201, 가입 직후 Access Token 발급 |
+| `POST /api/v1/auth/login` | `email`, `password` | 200, Access Token 발급 |
+
+두 API는 기존 `ApiResponse`를 사용한다. `data`에는 `userId`, `email`, `accessToken`,
+`tokenType: "Bearer"`, `expiresIn: 3600`이 들어간다. 예시 요청은 다음과 같다.
+
+```json
+{"email":"user@example.com","password":"MySecurePassword123!"}
+```
+
+- 이메일 앞뒤 공백을 제거하고 `Locale.ROOT` 기준 소문자로 정규화한 뒤 검증/저장한다.
+- 가입 비밀번호는 영문(A–Z 또는 a–z), 숫자(0–9), ASCII 특수문자(예: `!`, `@`, `_`)를 각각 하나 이상 포함해 8자 이상이며 UTF-8 기준 72바이트 이하여야 한다.
+  공백·한글·이모지는 필수 특수문자로 인정하지 않는다. 대문자와 소문자를 모두 포함할 필요는 없다. 기존 계정 로그인에는 새 가입 조합 규칙을 소급 적용하지 않는다.
+  비밀번호 자체를 trim하거나 소문자로 바꾸지 않는다. BCrypt strength 10으로 해싱하며 로그인에는 `matches`를 사용한다.
+- 이메일 중복은 409, 입력 오류는 400이다. 존재하지 않는 이메일과 잘못된 비밀번호는 동일한 401 메시지를 반환한다.
+- 정지/탈퇴 계정은 비밀번호 검증 성공 이후 403을 반환한다. 토큰 발급 후 상태가 바뀌어도 다음 보호 요청부터 403이다.
+- 기존 대소문자 혼합 이메일도 조회한다. 기존 데이터에 대소문자만 다른 계정이 여러 개 있으면 임의 선택 없이 로그인을 거부한다.
+  이번 작업에서는 기존 데이터를 수정하지 않는다.
+- 가입 API의 모든 쓰기는 정규화되므로 동시 가입도 기존 `app_user_email_key` UNIQUE 제약으로 최종 방어한다.
+  이 DB 제약 자체는 대소문자를 구분한다. 별도 SQL/내부 서비스로 회원을 생성하는 경로까지 정규화가 강제되는 것은 아니다.
+
+### JWT와 인증 사용자
+
+HS256 서명, issuer `cast-api`, subject `userId`, `iat`/`exp`를 사용하며 유효 기간은 60분이다.
+Spring Security OAuth2 Resource Server가 서명과 클레임을 검증하고 매 보호 요청마다 현재 DB 사용자의 존재/ACTIVE 상태를 확인한다.
+일반 API는 `Authorization: Bearer <accessToken>`으로 호출한다. 세션, HTTP Basic, 폼 로그인은 사용하지 않는다.
+쿠키 인증을 사용하지 않으므로 일반 API의 CSRF 검사를 끄며, JWT를 쿼리 파라미터에서 받지 않는다.
+공개 업무 경로는 두 인증 POST와 `GET /actuator/health`이며 Swagger UI/명세 GET 경로도 인증 없이 접근한다.
+`/internal/ai/**`는 기존 별도 인증 체인을 유지한다.
+
+이후 출처보관함 등 사용자별 API에서 다음처럼 검증된 사용자 ID를 받아 소유권을 검사한다.
+요청 본문/쿼리의 `userId`를 로그인 사용자로 신뢰하지 않는다.
+
+```java
+public ResponseEntity<?> example(@AuthenticationPrincipal AuthenticatedUser principal) {
+    Long currentUserId = principal.userId();
+    // currentUserId와 리소스의 실제 소유자 ID를 비교한 뒤 조회/수정한다.
+    // ...
+}
+```
+
+`AuthenticatedUser`는 `com.example.cast.auth.security` 패키지다. 실제 출처보관함 API 구현은 이번 범위에 포함하지 않는다.
+Refresh Token, 재발급/로그아웃 API는 제공하지 않는다. 만료 후 다시 로그인해야 하며 비밀번호 변경만으로 기존 토큰을 폐기하지 않는다.
+
+### 실행 환경 설정
+
+`CAST_JWT_SECRET_BASE64`는 디코딩 후 최소 32바이트의 랜덤 키여야 한다. 누락, 잘못된 Base64,
+짧은 키는 앱 시작을 실패시킨다. 실제 키나 키의 기본값은 저장소에 넣지 않는다.
+다음 PowerShell 코드는 안전한 랜덤 키를 **현재 프로세스 환경변수**에 설정하며 키를 출력하지 않는다.
+이 명령은 앱/DB를 실행하지 않는다. 앱을 실행하는 터미널이나 IDE 실행 설정에 같은 키를 제공한다.
+
+```powershell
+$jwtKeyBytes = New-Object byte[] 32
+$jwtRng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+try {
+    $jwtRng.GetBytes($jwtKeyBytes)
+    $env:CAST_JWT_SECRET_BASE64 = [Convert]::ToBase64String($jwtKeyBytes)
+} finally {
+    $jwtRng.Dispose()
+    [Array]::Clear($jwtKeyBytes, 0, $jwtKeyBytes.Length)
+}
+$env:CAST_CORS_ALLOWED_ORIGINS = 'http://localhost:5173'
+```
+
+여러 백엔드 인스턴스에는 같은 키를 안전한 비밀 저장소로 제공한다. 키를 새로 생성하면 기존 키로 발급한 토큰은 검증되지 않는다.
+`CAST_CORS_ALLOWED_ORIGINS`는 쉼표로 구분한 프론트엔드 Origin이며 기본값은 `http://localhost:5173`이다.
+예: `https://cast.example.com,https://admin.cast.example.com`. 와일드카드, 경로, 마지막 `/`는 허용하지 않는다.
+Spring 실행은 `.env`를 자동으로 읽지 않으므로 `.env.example`만 채워서는 적용되지 않는다.
+
+## Swagger로 회원가입·로그인 확인
+
+Spring 백엔드를 실행한 뒤 다음 주소에서 확인한다. 별도 프론트엔드 서버(5173)는 필요하지 않다.
+
+- Swagger UI: <http://localhost:8080/swagger-ui/index.html> (`/swagger-ui.html`도 사용 가능)
+- OpenAPI JSON: <http://localhost:8080/v3/api-docs>
+
+`local` 프로필에서는 기존 DB와 JWT 환경변수를 준비한 뒤 같은 PowerShell 창에서 실행한다.
+앱 시작 시 미적용 Flyway 마이그레이션이 실행될 수 있다.
+
+```powershell
+cd C:\Development\Spring\cast\cast
+$env:SPRING_PROFILES_ACTIVE = 'local'
+.\mvnw.cmd spring-boot:run
+```
+
+1. `Auth` → `POST /api/v1/auth/signup` → **Try it out**을 누른다.
+2. 사용하지 않은 이메일과 조건에 맞는 비밀번호를 입력하고 **Execute**를 누른다. 실제 연결 DB에 회원이 저장된다.
+3. 201 응답의 `data.accessToken`과 `expiresIn: 3600`을 확인한다.
+4. `POST /api/v1/auth/login`에서 같은 이메일·비밀번호로 실행하여 200 응답을 확인한다.
+
+두 인증 API는 **Authorize 없이** 사용할 수 있다. 이후 보호 API를 문서에 추가하면 Authorize에
+`Bearer ` 접두사 없이 Access Token 값만 입력한다. 브라우저 새로고침 후 인증 정보는 유지하지 않는다.
+현재 문서 대상은 `/api/v1/auth/**`이며 AI 내부 API와 테스트용 API는 노출하지 않는다.
+
+링큐의 [SwaggerConfig](https://github.com/LinkYou-2025/LinkU_backend/blob/develop/src/main/java/com/umc/linkyou/config/swagger/SwaggerConfig.java)와
+[AuthApi](https://github.com/LinkYou-2025/LinkU_backend/blob/develop/src/main/java/com/umc/linkyou/web/api/AuthApi.java)를 참고해
+상대 서버 URL, JWT Bearer 스키마, 문서 인터페이스 분리, 공통 응답 예시를 적용했다.
+CAST에서는 표준 OpenAPI 어노테이션을 사용하고, Boot 4.1에 맞춰 springdoc 3.2.0을 사용한다.
 
 ## 테스트
 
 테스트 실행 승인을 받은 환경에서 `CAST_PERSISTENCE_TEST_APPROVED=YES`를 설정하고 `.\mvnw.cmd test`를 실행한다.
 테스트는 임시 PostgreSQL만 사용하고 기존 DB/볼륨에 연결하지 않는다.
 공통 테스트의 `@DynamicPropertySource`는 환경변수보다 우선하여 AI 전송을 끄고 테스트 전용 콜백 토큰을 사용한다.
+JWT 키와 CORS Origin도 테스트 전용 값으로 고정하며 실제 실행 환경의 비밀을 사용하지 않는다.
 `test` 프로필의 YAML만으로는 환경변수를 덮어쓸 수 없으므로 이 설정을 함께 유지한다.
 Flyway는 실제 `cast_migrator`, JPA는 `cast_app`, AI SQL 검증은 `cast_ai`로 실행한다.
 
@@ -110,5 +214,10 @@ Flyway는 실제 `cast_migrator`, JPA는 `cast_app`, AI SQL 검증은 `cast_ai`�
 - 기존 볼륨 계정 전환 스크립트의 재실행과 다른 DB 소유권 보존
 - 가짜 AI HTTP 서버를 통한 전송 계약/재시도와 트랜잭션 경계
 - 기존 HTTP 응답 및 내부 콜백 인증/검증
+- 회원가입/로그인 공통 응답, BCrypt 해싱, 이메일 정규화, 비밀번호 UTF-8 경계
+- 동시 가입 충돌과 이메일 UNIQUE/기타 무결성 오류의 구분
+- JWT 서명/만료/issuer/subject/필수 클레임, 계정 상태 변경, 존재하지 않는 사용자
+- 테스트 전용 API의 인증 principal/소유권, CORS, 세션/쿼리 토큰 거부, 키 설정 오류의 시작 거부
+- Swagger UI/명세의 공개 접근, 인증 API의 토큰 불필요 표시, 응답 스키마·예시와 실제 코드의 일치
 
 실제 AI 서버 소스와 모델 실행은 이 저장소에 없으므로 그 서버와의 실환경 통합 테스트는 별도다.

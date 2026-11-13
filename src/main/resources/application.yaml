@@ -9,7 +9,21 @@ spring:
     default-schema: public
     schemas: public
 
+springdoc:
+  default-produces-media-type: application/json
+  paths-to-match: /api/v1/auth/**
+  override-with-generic-response: false
+  swagger-ui:
+    persist-authorization: false
+    disable-swagger-default-url: true
+    operations-sorter: alpha
+    tags-sorter: alpha
+
 cast:
+  jwt:
+    secret-base64: ${CAST_JWT_SECRET_BASE64:}
+  cors:
+    allowed-origins: ${CAST_CORS_ALLOWED_ORIGINS:http://localhost:5173}
   ai:
     enabled: ${CAST_AI_ENABLED:false}
     base-url: ${CAST_AI_BASE_URL:}
