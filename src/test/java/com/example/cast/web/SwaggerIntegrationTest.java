@@ -38,7 +38,7 @@ class SwaggerIntegrationTest extends TestDatabaseSupport {
 
     @Test void specDocumentsOnlyAuthAndDoesNotRequireTokenForSignupOrLogin() throws Exception {
         JsonNode spec = spec();
-        assertThat(spec.get("paths").size()).isEqualTo(2);
+        assertThat(spec.get("paths").size()).isEqualTo(3);
         assertThat(spec.at("/paths/~1api~1v1~1auth~1signup/post/security").isArray()).isTrue();
         assertThat(spec.at("/paths/~1api~1v1~1auth~1signup/post/security").size()).isZero();
         assertThat(spec.at("/paths/~1api~1v1~1auth~1login/post/security").isArray()).isTrue();
