@@ -12,7 +12,7 @@ import java.time.ZoneOffset;
 
 @Getter
 @Entity
-@Table(name = "user_consent")
+@Table(schema = "backend", name = "user_consent")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class UserConsent {
 

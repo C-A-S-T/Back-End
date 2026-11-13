@@ -8,8 +8,7 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(
-        name = "verification",
+@Table(schema = "backend", name = "verification",
         uniqueConstraints = @UniqueConstraint(
                 name = "uq_verification_claim_attempt",
                 columnNames = {"claim_id", "ver_attempt_number"}
@@ -51,14 +50,12 @@ public class Verification extends BaseTimeEntity {
     @Column(name = "llm_result", length = 24)
     private VerificationStatus llmResult;
     private Double confidence;
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "run_id")
-    private com.example.cast.retrieval.entity.RetrievalRun retrievalRun;
-
-    /** 검색 실행의 소속을 서비스에서 확인한 후 검증 시작 시 연결한다. */
-    public void linkRun(com.example.cast.retrieval.entity.RetrievalRun run) {
+    /** 진단용 외부 ID. AI 검색 이력을 JPA로 조회하지 않는다. */
+    @Column(name = "ai_run_id")
+    private Long aiRunId;
+    public void linkAiRun(Long aiRunId) {
         if (isCompleted()) throw new IllegalStateException("Verification is already completed");
-        this.retrievalRun = run;
+        this.aiRunId = aiRunId;
     }
 
     /** 서비스에서 결과 조합과 신뢰도를 검증한 뒤 한 번만 완료한다. */

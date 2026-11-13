@@ -10,7 +10,7 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(name = "research_query")
+@Table(schema = "backend", name = "research_query")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ResearchQuery extends BaseTimeEntity {
 

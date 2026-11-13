@@ -1,0 +1,7 @@
+# Never dispatch test jobs to an AI server configured in the developer environment.
+cast:
+  ai:
+    enabled: false
+    base-url: ""
+    api-token: ""
+    callback-token: ""

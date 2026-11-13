@@ -10,8 +10,7 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(
-        name = "claim",
+@Table(schema = "backend", name = "claim",
         uniqueConstraints = @UniqueConstraint(
                 name = "uq_claim_answer_index",
                 columnNames = {"answer_id", "claim_index"}
