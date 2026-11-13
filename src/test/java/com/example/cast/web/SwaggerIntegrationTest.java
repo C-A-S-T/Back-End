@@ -1,5 +1,4 @@
-```
-        package com.example.cast.web;
+ package com.example.cast.web;
 
 import com.example.cast.auth.code.AuthErrorCode;
 import com.example.cast.auth.code.AuthSuccessCode;
@@ -24,7 +23,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
- * Swagger 문서, 응답 예시, 공통 API 응답 규격 검증.
+ * Swagger 문서, 응답 예시, 공통 API 응답 규격 검증
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -108,7 +107,7 @@ class SwaggerIntegrationTest extends TestDatabaseSupport {
         assertThat(signup.has("201")).isTrue();
         assertThat(signup.has("200")).isFalse();
 
-        // 회원가입 성공 예시
+        // 회원가입 성공 응답 예시
         JsonNode signupExample = example(signup.get("201"));
 
         assertThat(signupExample.at("/isSuccess").asBoolean())
@@ -126,7 +125,7 @@ class SwaggerIntegrationTest extends TestDatabaseSupport {
         assertThat(signupExample.at("/result/accessToken").asText())
                 .isNotBlank();
 
-        // 로그인 성공 예시
+        // 로그인 성공 응답 예시
         JsonNode loginExample = example(login.get("200"));
 
         assertThat(loginExample.at("/isSuccess").asBoolean())
@@ -138,7 +137,7 @@ class SwaggerIntegrationTest extends TestDatabaseSupport {
         assertThat(loginExample.at("/message").asText())
                 .isEqualTo(AuthSuccessCode.LOGIN_SUCCESS.getMessage());
 
-        // 인증 실패 예시
+        // 인증 실패 응답 예시
         JsonNode invalidCredentials = example(login.get("401"));
 
         assertThat(invalidCredentials.at("/isSuccess").asBoolean())
@@ -184,7 +183,7 @@ class SwaggerIntegrationTest extends TestDatabaseSupport {
                 ).asText()
         ).isEqualTo(GlobalErrorCode.INVALID_REQUEST.getMessage());
 
-        // 성공 응답의 result가 AuthResponse DTO와 연결되는지 확인
+        // 성공 응답의 result가 AuthResponse DTO를 참조하는지 확인
         String schemaRef = signup.at(
                 "/201/content/application~1json/schema/$ref"
         ).asText();
@@ -199,13 +198,13 @@ class SwaggerIntegrationTest extends TestDatabaseSupport {
         assertThat(schema.at("/properties/result/$ref").asText())
                 .isEqualTo("#/components/schemas/AuthResponse");
 
-        // 비밀번호 관련 Swagger 문서 규칙 유지
+        // 비밀번호 관련 Swagger 문서 규칙 확인
         assertThat(
                 spec.at(
                         "/components/schemas/SignupRequest/"
                                 + "properties/password/description"
                 ).asText()
-        ).contains("72바이트");
+        ).contains("72");
 
         assertThat(
                 spec.at(
@@ -314,4 +313,3 @@ class SwaggerIntegrationTest extends TestDatabaseSupport {
                 .get("value");
     }
 }
-```

@@ -2,8 +2,10 @@
 package com.example.cast.research.controller;
 
 import com.example.cast.auth.security.AuthenticatedUser;
+import com.example.cast.global.code.CommonSuccessCode;
 import com.example.cast.global.code.GlobalErrorCode;
 import com.example.cast.global.exception.BusinessException;
+import com.example.cast.global.response.ApiResponse;
 import com.example.cast.research.dto.response.ResearchResultResponse;
 import com.example.cast.research.service.ResearchResultService;
 
@@ -15,9 +17,15 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "AI Research", description = "AI 답변 생성 작업의 결과를 조회하는 API")
+@Tag(
+        name = "AI Research",
+        description = "AI 답변 생성 작업의 결과를 조회하는 API"
+)
 @SecurityRequirement(name = "bearerAuth")
 @RestController
 @RequestMapping("/api/research-tasks")
@@ -32,19 +40,24 @@ public class ResearchController {
                     + "JWT 인증이 필요하며, 본인이 생성한 작업만 조회할 수 있습니다."
     )
     @GetMapping("/{taskId}")
-    public ResponseEntity<ResearchResultResponse> getResult(
-            @Parameter(description = "조회할 AI 작업 ID", required = true)
+    public ResponseEntity<ApiResponse<ResearchResultResponse>> getResult(
+            @Parameter(
+                    description = "조회할 AI 작업 ID",
+                    required = true
+            )
             @PathVariable Long taskId,
             Authentication authentication
     ) {
-        if (authentication == null || !authentication.isAuthenticated()
+        if (authentication == null
+                || !authentication.isAuthenticated()
                 || !(authentication.getPrincipal() instanceof AuthenticatedUser user)) {
             throw new BusinessException(GlobalErrorCode.UNAUTHORIZED);
         }
 
         Long userId = user.userId();
 
-        return ResponseEntity.ok(
+        return ApiResponse.success(
+                CommonSuccessCode.OK,
                 researchResultService.getResult(userId, taskId)
         );
     }
