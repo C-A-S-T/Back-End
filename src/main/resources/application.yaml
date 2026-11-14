@@ -14,6 +14,7 @@ springdoc:
   paths-to-match:
     - /api/v1/auth/**
     - /api/v1/sources/**
+    - /api/research-tasks/**
   override-with-generic-response: false
   swagger-ui:
     persist-authorization: false

@@ -14,19 +14,20 @@ import java.io.IOException;
 public class AiServerClient {
     private final AiProperties properties;
     private final ObjectMapper mapper;
-    private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
+    private final HttpClient client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).connectTimeout(Duration.ofSeconds(3)).build();
     public void submit(AiJobRequest job) throws IOException, InterruptedException {
         if (TransactionSynchronizationManager.isActualTransactionActive())
             throw new IllegalStateException("AI HTTP calls must run outside database transactions");
         if (properties.baseUrl() == null || properties.apiToken().isBlank())
             throw new IllegalStateException("AI endpoint is not configured");
+        var json = mapper.writeValueAsBytes(job);
         var request = HttpRequest.newBuilder(properties.baseUrl().resolve("/v1/research-jobs"))
                 .timeout(Duration.ofSeconds(30)).header("Content-Type", "application/json")
                 .header("X-AI-Service-Token", properties.apiToken())
                 .header("Idempotency-Key", job.jobId().toString())
-                .POST(HttpRequest.BodyPublishers.ofByteArray(mapper.writeValueAsBytes(job))).build();
-        var response = client.send(request, HttpResponse.BodyHandlers.discarding());
+                .POST(HttpRequest.BodyPublishers.ofByteArray(json)).build();
+        var response = client.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() < 200 || response.statusCode() >= 300)
-            throw new IOException("AI job submission returned HTTP " + response.statusCode());
+            throw new IOException("AI job submission returned HTTP " + response.statusCode() + ", body=" + response.body());
     }
 }
