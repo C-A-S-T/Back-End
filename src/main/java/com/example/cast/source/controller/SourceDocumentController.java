@@ -3,6 +3,7 @@ package com.example.cast.source.controller;
 import com.example.cast.auth.security.AuthenticatedUser;
 import com.example.cast.global.code.CommonSuccessCode;
 import com.example.cast.global.response.ApiResponse;
+import com.example.cast.source.dto.response.SourceDocumentDetailResponse;
 import com.example.cast.source.dto.response.SourceDocumentListResponse;
 import com.example.cast.source.service.SourceDocumentService;
 import lombok.RequiredArgsConstructor;
@@ -26,5 +27,14 @@ public class SourceDocumentController implements SourceDocumentApi {
     ) {
         return ApiResponse.success(CommonSuccessCode.OK,
                 documentService.listDocuments(user.userId(), folderId, page, size));
+    }
+
+    @Override
+    public ResponseEntity<ApiResponse<SourceDocumentDetailResponse>> getDocumentDetail(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            Long savedSourceId
+    ) {
+        return ApiResponse.success(CommonSuccessCode.OK,
+                documentService.getDocumentDetail(user.userId(), savedSourceId));
     }
 }

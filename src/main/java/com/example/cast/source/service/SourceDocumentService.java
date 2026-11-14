@@ -2,6 +2,7 @@ package com.example.cast.source.service;
 
 import com.example.cast.global.code.GlobalErrorCode;
 import com.example.cast.global.exception.BusinessException;
+import com.example.cast.source.dto.response.SourceDocumentDetailResponse;
 import com.example.cast.source.dto.response.SourceDocumentListResponse;
 import com.example.cast.source.dto.response.SourceDocumentListResponse.DocumentItem;
 import com.example.cast.source.entity.SavedSource;
@@ -44,6 +45,36 @@ public class SourceDocumentService {
                 saved.getContent().stream().map(this::toItem).toList(),
                 saved.getNumber(), saved.getSize(), saved.getTotalElements(),
                 saved.getTotalPages(), saved.hasNext()
+        );
+    }
+
+    public SourceDocumentDetailResponse getDocumentDetail(Long userId, Long savedSourceId) {
+        if (savedSourceId == null || savedSourceId <= 0) {
+            throw new BusinessException(GlobalErrorCode.INVALID_REQUEST);
+        }
+
+        SavedSource saved = documentRepository.findBySavedSourceIdAndUser_UserId(savedSourceId, userId)
+                .orElseThrow(() -> new BusinessException(GlobalErrorCode.NOT_FOUND));
+        var document = saved.getDocument();
+        var originTask = saved.getOriginTask();
+
+        return new SourceDocumentDetailResponse(
+                saved.getSavedSourceId(),
+                document.getDocumentId(),
+                document.getDocTitle(),
+                document.getSourceName(),
+                document.getSourceUrl(),
+                document.getPublishedAt(),
+                document.getEffectiveFrom(),
+                document.getEffectiveTo(),
+                document.getDocVersion(),
+                document.getSourceType(),
+                document.getReliabilityLevel(),
+                saved.getSaveMethod(),
+                saved.getFolderId(),
+                saved.isFavorite(),
+                originTask == null ? null : originTask.getTaskId(),
+                saved.getCreatedAt()
         );
     }
 

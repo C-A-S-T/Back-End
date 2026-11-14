@@ -3,6 +3,7 @@ package com.example.cast.source.controller;
 import com.example.cast.auth.security.AuthenticatedUser;
 import com.example.cast.global.config.SwaggerConfig;
 import com.example.cast.global.response.ApiResponse;
+import com.example.cast.source.dto.response.SourceDocumentDetailResponse;
 import com.example.cast.source.dto.response.SourceDocumentListResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -15,6 +16,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 
 @Tag(name = "Source Archive", description = "사용자의 출처보관함 조회")
@@ -67,6 +69,49 @@ public interface SourceDocumentApi {
             @RequestParam(defaultValue = "20") int size
     );
 
+    @Operation(
+            summary = "저장 문서 상세 조회",
+            description = """
+                    로그인 사용자가 보관한 자동·수동 저장 문서의 메타데이터를 조회합니다.
+                    savedSourceId는 사용자의 저장 기록 ID이며, 다른 사용자 소유 기록은 404를 반환합니다.
+                    원문 전체, AI 문서 요약, 최신 버전 판정 및 검증 근거는 반환하지 않습니다.
+                    originTaskId는 해당 문서를 최초 저장하게 된 연구 작업 ID이며 없으면 null입니다.
+                    """,
+            security = @SecurityRequirement(name = SwaggerConfig.JWT_SCHEME)
+    )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200", description = "저장 문서 상세 조회 성공",
+                    useReturnTypeSchema = true,
+                    content = @Content(mediaType = "application/json",
+                            examples = @ExampleObject(name = "DOCUMENT_DETAIL_SUCCESS", value = DOCUMENT_DETAIL_SUCCESS))
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "400", description = "저장 기록 ID 형식 또는 값 오류",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ApiResponse.class),
+                            examples = @ExampleObject(name = "INVALID_REQUEST", value = INVALID_REQUEST))
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "401", description = "JWT 미입력·만료·검증 실패",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ApiResponse.class),
+                            examples = @ExampleObject(name = "UNAUTHORIZED", value = UNAUTHORIZED))
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "404", description = "존재하지 않거나 소유하지 않은 저장 기록",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ApiResponse.class),
+                            examples = @ExampleObject(name = "DOCUMENT_NOT_FOUND", value = FOLDER_NOT_FOUND))
+            )
+    })
+    @GetMapping("/documents/{savedSourceId}")
+    ResponseEntity<ApiResponse<SourceDocumentDetailResponse>> getDocumentDetail(
+            @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser user,
+            @Parameter(description = "출처보관함 저장 기록 ID", example = "12")
+            @PathVariable Long savedSourceId
+    );
+
     String DOCUMENT_LIST_SUCCESS = """
             {
               "isSuccess": true,
@@ -93,6 +138,33 @@ public interface SourceDocumentApi {
                 "totalElements": 1,
                 "totalPages": 1,
                 "hasNext": false
+              }
+            }
+            """;
+
+    String DOCUMENT_DETAIL_SUCCESS = """
+            {
+              "isSuccess": true,
+              "code": "COMMON200",
+              "message": "성공입니다.",
+              "timestamp": "2026-11-14T18:30:00",
+              "result": {
+                "savedSourceId": 12,
+                "documentId": 31,
+                "documentTitle": "가상 A 청년월세지원 사업 공고문",
+                "sourceName": "가상 청년지원센터",
+                "sourceUrl": "https://example.go.kr/document",
+                "publishedAt": "2026-10-01",
+                "effectiveFrom": "2026-11-01",
+                "effectiveTo": null,
+                "documentVersion": "2026-1",
+                "sourceType": "GOVERNMENT",
+                "reliabilityLevel": "HIGH",
+                "saveMethod": "AUTO",
+                "folderId": null,
+                "favorite": false,
+                "originTaskId": 7,
+                "savedAt": "2026-11-14T08:30:00Z"
               }
             }
             """;

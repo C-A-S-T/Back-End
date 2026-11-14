@@ -1,6 +1,7 @@
 package com.example.cast.source.repository;
 
 import com.example.cast.source.entity.SavedSource;
+import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -12,4 +13,7 @@ public interface SourceDocumentRepository extends JpaRepository<SavedSource, Lon
 
     @EntityGraph(attributePaths = "document")
     Page<SavedSource> findByUser_UserIdAndFolderId(Long userId, Long folderId, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"document", "originTask"})
+    Optional<SavedSource> findBySavedSourceIdAndUser_UserId(Long savedSourceId, Long userId);
 }
