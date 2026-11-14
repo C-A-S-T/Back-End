@@ -1,7 +1,10 @@
 package com.example.cast.source.service;
 
+import com.example.cast.document.entity.Document;
 import com.example.cast.global.code.GlobalErrorCode;
 import com.example.cast.global.exception.BusinessException;
+import com.example.cast.source.dto.response.PolicyChangeDetailResponse;
+import com.example.cast.source.dto.response.PolicyChangeDetailResponse.DocumentInfo;
 import com.example.cast.source.dto.response.PolicyChangeListResponse;
 import com.example.cast.source.dto.response.PolicyChangeListResponse.PolicyChangeItem;
 import com.example.cast.source.repository.PolicyChangeRepository;
@@ -50,5 +53,37 @@ public class PolicyChangeService {
         }).toList();
         return new PolicyChangeListResponse(items, result.getNumber(), result.getSize(),
                 result.getTotalElements(), result.getTotalPages(), result.hasNext());
+    }
+
+    public PolicyChangeDetailResponse getDetail(long userId, Long policyChangeId) {
+        if (userId <= 0 || policyChangeId == null || policyChangeId <= 0) {
+            throw new BusinessException(GlobalErrorCode.INVALID_REQUEST);
+        }
+
+        var row = repository.findDetail(userId, policyChangeId)
+                .orElseThrow(() -> new BusinessException(GlobalErrorCode.NOT_FOUND));
+        var change = row.change();
+        var impact = row.impact();
+        return new PolicyChangeDetailResponse(
+                change.getPolicyChangeId(),
+                change.getPolicyTitle(),
+                change.getCategory(),
+                change.getChangeSummary(),
+                change.getConfirmedAt(),
+                toDocumentInfo(change.getPreviousDocument()),
+                toDocumentInfo(change.getCurrentDocument()),
+                impact == null ? null : impact.getRequiresRecheck(),
+                impact == null ? null : impact.getImpactSummary(),
+                impact == null ? null : impact.getEvaluatedAt()
+        );
+    }
+
+    private DocumentInfo toDocumentInfo(Document document) {
+        return new DocumentInfo(
+                document.getDocumentId(), document.getDocTitle(), document.getDocVersion(),
+                document.getSourceName(), document.getSourceUrl(), document.getPublishedAt(),
+                document.getEffectiveFrom(), document.getEffectiveTo(),
+                document.getSourceType(), document.getReliabilityLevel()
+        );
     }
 }

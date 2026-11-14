@@ -3,6 +3,7 @@ package com.example.cast.source.controller;
 import com.example.cast.auth.security.AuthenticatedUser;
 import com.example.cast.global.config.SwaggerConfig;
 import com.example.cast.global.response.ApiResponse;
+import com.example.cast.source.dto.response.PolicyChangeDetailResponse;
 import com.example.cast.source.dto.response.PolicyChangeListResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -15,6 +16,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 
 @Tag(name = "Source Archive", description = "사용자의 출처보관함 조회")
@@ -60,6 +62,36 @@ public interface PolicyChangeApi {
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "페이지당 카드 수 (1~100)", example = "20")
             @RequestParam(defaultValue = "20") int size);
+
+    @Operation(summary = "정책 변경 상세 조회",
+            description = """
+                    모든 로그인 사용자는 확인된 정책 변경 요약과 이전·이후 문서 메타데이터를 조회할 수 있습니다.
+                    사용자가 두 문서를 출처보관함에 저장하지 않아도 조회할 수 있습니다(B안).
+                    사용자별 재확인 여부·영향 요약·평가 시각은 요청한 사용자에게 해당하는 값만 반환합니다.
+                    영향 평가 기록이 없으면 세 필드는 null로 반환합니다.
+                    정책 비교 AI 호출이나 조항별 Before/After 결과 생성은 하지 않습니다.
+                    이전·이후 문서는 비교 대상으로 지정된 스냅샷이며 최신 버전임을 보장하지 않습니다.
+                    """,
+            security = @SecurityRequirement(name = SwaggerConfig.JWT_SCHEME))
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200", description = "정책 변경 상세 조회 성공",
+                    useReturnTypeSchema = true),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "400", description = "잘못된 정책 변경 ID",
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "401", description = "JWT 인증 필요",
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "404", description = "정책 변경 기록 없음",
+                    content = @Content(schema = @Schema(implementation = ApiResponse.class)))
+    })
+    @GetMapping("/policy-changes/{policyChangeId}")
+    ResponseEntity<ApiResponse<PolicyChangeDetailResponse>> getDetail(
+            @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser user,
+            @Parameter(description = "정책 변경 기록 ID (1 이상)", example = "12")
+            @PathVariable Long policyChangeId);
 
     String EMPTY_RESULT = """
             {

@@ -6,6 +6,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -59,6 +60,27 @@ public class PolicyChangeRepository {
                         (UserPolicyChangeImpact) row[1]))
                 .toList();
         return new PageImpl<>(items, pageable, total);
+    }
+
+    /** 공통 변경 기록과 요청 사용자에 해당하는 영향 평가만 함께 조회한다. */
+    public Optional<PolicyChangeRow> findDetail(long userId, long policyChangeId) {
+        var query = em.createQuery("""
+                SELECT p, i FROM PolicyChange p
+                JOIN FETCH p.previousDocument
+                JOIN FETCH p.currentDocument
+                LEFT JOIN p.impacts i ON i.user.userId = :userId
+                WHERE p.policyChangeId = :policyChangeId
+                """, Object[].class);
+        var rows = query.setParameter("userId", userId)
+                .setParameter("policyChangeId", policyChangeId)
+                .setMaxResults(1)
+                .getResultList();
+        if (rows.isEmpty()) {
+            return Optional.empty();
+        }
+        Object[] row = rows.getFirst();
+        return Optional.of(new PolicyChangeRow(
+                (PolicyChange) row[0], (UserPolicyChangeImpact) row[1]));
     }
 
     private void bind(Query query, long userId, String pattern, Boolean requiresRecheck) {
