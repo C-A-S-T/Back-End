@@ -10,7 +10,7 @@ public record SourceOverviewResponse(
         long totalSavedDocumentCount,
         @Schema(description = "최초 저장 방식이 AUTO인 문서 수", example = "20")
         long autoSavedDocumentCount,
-        @Schema(description = "문장 스크랩 기능 구현 전까지 null 반환", nullable = true)
+        @Schema(description = "사용자의 근거 원문 스크랩 수", example = "0")
         Long scrappedSentenceCount,
         @Schema(description = "정책 변경 추적 기능 구현 전까지 null 반환", nullable = true)
         Long changedPolicyCount,

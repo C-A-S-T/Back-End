@@ -35,6 +35,15 @@ public class SourceOverviewRepository {
         );
     }
 
+    public long countSentenceScraps(long userId) {
+        //noinspection JpaQueryApiInspection
+        return ((Number) em.createNativeQuery("""
+                SELECT COUNT(*) FROM backend.sentence_scrap WHERE user_id = :userId
+                """)
+                .setParameter("userId", userId)
+                .getSingleResult()).longValue();
+    }
+
     public List<FolderCounts> countFixedFolders(long userId) {
         @SuppressWarnings("JpaQueryApiInspection") List<?> rows = em.createNativeQuery("""
                 SELECT f.folder_id, f.folder_category, f.folder_name,

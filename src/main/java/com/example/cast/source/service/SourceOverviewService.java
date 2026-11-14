@@ -16,6 +16,7 @@ public class SourceOverviewService {
 
     public SourceOverviewResponse getOverview(long userId) {
         var counts = overviewRepository.countSavedSources(userId);
+        long scrapCount = overviewRepository.countSentenceScraps(userId);
         List<FolderOverview> folders = overviewRepository.countFixedFolders(userId)
                 .stream()
                 .map(folder -> new FolderOverview(
@@ -29,7 +30,7 @@ public class SourceOverviewService {
         return new SourceOverviewResponse(
                 counts.total(),
                 counts.automatic(),
-                null, // Not available until sentence-scrap persistence is implemented.
+                scrapCount,
                 null, // Not available until policy-change persistence is implemented.
                 folders.size(),
                 counts.unclassified(),

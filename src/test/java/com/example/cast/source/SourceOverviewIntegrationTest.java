@@ -50,9 +50,8 @@ class SourceOverviewIntegrationTest extends TestDatabaseSupport {
         assertThat(result.path("legacyFolderDocumentCount").asLong()).isZero();
         assertThat(result.path("folderCount").asInt()).isEqualTo(3);
 
-        // Unsupported counts must be present as null, not misleading zeros.
-        assertThat(result.has("scrappedSentenceCount")).isTrue();
-        assertThat(result.get("scrappedSentenceCount").isNull()).isTrue();
+        // 스크랩 기능은 지원하고, 미구현 정책 변경 집계만 null로 남긴다.
+        assertThat(result.path("scrappedSentenceCount").asLong()).isZero();
         assertThat(result.has("changedPolicyCount")).isTrue();
         assertThat(result.get("changedPolicyCount").isNull()).isTrue();
 

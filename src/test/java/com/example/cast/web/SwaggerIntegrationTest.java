@@ -62,7 +62,7 @@ class SwaggerIntegrationTest extends TestDatabaseSupport {
 
         JsonNode spec = spec();
 
-        assertThat(spec.get("paths").size()).isEqualTo(6);
+        assertThat(spec.get("paths").size()).isEqualTo(9);
         JsonNode researchOperation = spec.at("/paths/~1api~1research-tasks~1{taskId}/get");
         assertThat(researchOperation.isMissingNode()).isFalse();
         assertThat(researchOperation.at("/security/0/bearerAuth").isArray()).isTrue();
@@ -156,6 +156,30 @@ class SwaggerIntegrationTest extends TestDatabaseSupport {
         assertThat(spec.at(schemaRef.substring(1))
                 .at("/properties/result/$ref").asString())
                 .isEqualTo("#/components/schemas/SourceDocumentDetailResponse");
+    }
+
+    @Test
+    void scrapAndResearchEvidenceSwaggerHaveBearerAndTypedResponses() throws Exception {
+        JsonNode spec = spec();
+        JsonNode research = spec.at("/paths/~1api~1research-tasks~1{taskId}~1evidences/get");
+        assertThat(research.isMissingNode()).isFalse();
+        assertThat(research.at("/security/0/bearerAuth").isArray()).isTrue();
+        String researchSchema = research.at("/responses/200/content/application~1json/schema/$ref").asString();
+        assertThat(spec.at(researchSchema.substring(1)).at("/properties/result/$ref").asString())
+                .isEqualTo("#/components/schemas/ResearchEvidenceResponse");
+
+        JsonNode scraps = spec.at("/paths/~1api~1v1~1sources~1scraps");
+        assertThat(scraps.at("/get").isMissingNode()).isFalse();
+        assertThat(scraps.at("/post").isMissingNode()).isFalse();
+        assertThat(scraps.at("/get/security/0/bearerAuth").isArray()).isTrue();
+        assertThat(scraps.at("/post/security/0/bearerAuth").isArray()).isTrue();
+        String listSchema = scraps.at("/get/responses/200/content/application~1json/schema/$ref").asString();
+        assertThat(spec.at(listSchema.substring(1)).at("/properties/result/$ref").asString())
+                .isEqualTo("#/components/schemas/SentenceScrapListResponse");
+        JsonNode remove = spec.at("/paths/~1api~1v1~1sources~1scraps~1{scrapId}/delete");
+        assertThat(remove.isMissingNode()).isFalse();
+        assertThat(remove.at("/security/0/bearerAuth").isArray()).isTrue();
+        assertThat(remove.at("/parameters").toString()).contains("scrapId");
     }
 
     @Test

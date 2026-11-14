@@ -27,7 +27,7 @@ public interface SourceOverviewApi {
                     전체 저장 문서 수는 자동·수동 저장 모두 포함하며,
                     자동 저장 문서 수는 최초 저장 방식이 AUTO인 문서만 포함합니다.
                     미분류 문서는 folderId가 null인 저장 문서입니다.
-                    스크랩 문장 수와 변경된 정책 수는 아직 집계 기능이 없어 null을 반환합니다.
+                    스크랩 문장 수는 사용자별 Evidence 북마크 수이며, 변경된 정책 수는 추적 기능 구현 전까지 null입니다.
                     """,
             security = @SecurityRequirement(name = SwaggerConfig.JWT_SCHEME)
     )
@@ -71,7 +71,7 @@ public interface SourceOverviewApi {
               "result": {
                 "totalSavedDocumentCount": 24,
                 "autoSavedDocumentCount": 20,
-                "scrappedSentenceCount": null,
+                "scrappedSentenceCount": 15,
                 "changedPolicyCount": null,
                 "folderCount": 3,
                 "unclassifiedDocumentCount": 2,
