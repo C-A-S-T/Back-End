@@ -62,7 +62,7 @@ class SwaggerIntegrationTest extends TestDatabaseSupport {
 
         JsonNode spec = spec();
 
-        assertThat(spec.get("paths").size()).isEqualTo(3);
+        assertThat(spec.get("paths").size()).isEqualTo(4);
 
         assertThat(spec.at(
                 "/paths/~1api~1v1~1auth~1signup/post/security"
@@ -110,6 +110,28 @@ class SwaggerIntegrationTest extends TestDatabaseSupport {
         assertThat(spec.at(schemaRef.substring(1))
                 .at("/properties/result/$ref").asText())
                 .isEqualTo("#/components/schemas/SourceOverviewResponse");
+    }
+
+    @Test
+    void documentsSwaggerHasBearerAndTypedResponse() throws Exception {
+        JsonNode spec = spec();
+        JsonNode operation = spec.at("/paths/~1api~1v1~1sources~1documents/get");
+
+        assertThat(operation.isMissingNode()).isFalse();
+        assertThat(operation.at("/security/0/bearerAuth").isArray()).isTrue();
+        assertThat(operation.at("/parameters").isArray()).isTrue();
+        assertThat(operation.at("/parameters").toString()).contains("folderId", "page", "size");
+        for (String code : new String[] {"200", "400", "401", "404"}) {
+            assertThat(operation.at("/responses/" + code).isMissingNode()).isFalse();
+        }
+
+        String responseSchemaRef = operation.at(
+                "/responses/200/content/application~1json/schema/$ref"
+        ).asString();
+        assertThat(responseSchemaRef).startsWith("#/components/schemas/");
+        assertThat(spec.at(responseSchemaRef.substring(1))
+                .at("/properties/result/$ref").asString())
+                .isEqualTo("#/components/schemas/SourceDocumentListResponse");
     }
 
     @Test

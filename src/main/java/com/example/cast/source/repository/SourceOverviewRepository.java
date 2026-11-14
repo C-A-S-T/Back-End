@@ -36,7 +36,7 @@ public class SourceOverviewRepository {
     }
 
     public List<FolderCounts> countFixedFolders(long userId) {
-        List<?> rows = em.createNativeQuery("""
+        @SuppressWarnings("JpaQueryApiInspection") List<?> rows = em.createNativeQuery("""
                 SELECT f.folder_id, f.folder_category, f.folder_name,
                        COUNT(s.saved_source_id)
                 FROM backend.source_folder f

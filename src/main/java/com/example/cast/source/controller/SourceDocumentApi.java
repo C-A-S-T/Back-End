@@ -1,0 +1,111 @@
+package com.example.cast.source.controller;
+
+import com.example.cast.auth.security.AuthenticatedUser;
+import com.example.cast.global.config.SwaggerConfig;
+import com.example.cast.global.response.ApiResponse;
+import com.example.cast.source.dto.response.SourceDocumentListResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+
+@Tag(name = "Source Archive", description = "사용자의 출처보관함 조회")
+public interface SourceDocumentApi {
+    @Operation(
+            summary = "저장 문서 전체·폴더별 목록 조회",
+            description = """
+                    로그인 사용자의 자동·수동 저장 문서를 최신 저장순으로 조회합니다.
+                    folderId를 생략하면 미분류 및 기존 폴더 문서를 포함한 전체 목록을 반환합니다.
+                    folderId를 전달하면 사용자가 소유한 고정 폴더의 문서만 반환합니다.
+                    page는 0부터 시작하며 size는 1~100입니다. 기본값은 page=0, size=20입니다.
+                    """,
+            security = @SecurityRequirement(name = SwaggerConfig.JWT_SCHEME)
+    )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "저장 문서 목록 조회 성공",
+                    useReturnTypeSchema = true,
+                    content = @Content(mediaType = "application/json",
+                            examples = @ExampleObject(name = "DOCUMENT_LIST_SUCCESS", value = DOCUMENT_LIST_SUCCESS))
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "400", description = "페이지, 크기, 폴더 ID 요청값 오류",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ApiResponse.class),
+                            examples = @ExampleObject(name = "INVALID_REQUEST", value = INVALID_REQUEST))
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "401", description = "JWT 미입력·만료·검증 실패",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ApiResponse.class),
+                            examples = @ExampleObject(name = "UNAUTHORIZED", value = UNAUTHORIZED))
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "404", description = "존재하지 않거나 소유하지 않은 고정 폴더",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ApiResponse.class),
+                            examples = @ExampleObject(name = "FOLDER_NOT_FOUND", value = FOLDER_NOT_FOUND))
+            )
+    })
+    @GetMapping("/documents")
+    ResponseEntity<ApiResponse<SourceDocumentListResponse>> listDocuments(
+            @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser user,
+            @Parameter(description = "고정 폴더 ID (생략 시 전체 조회)", example = "3")
+            @RequestParam(required = false) Long folderId,
+            @Parameter(description = "0부터 시작하는 페이지 번호", example = "0")
+            @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "페이지당 문서 수 (1~100)", example = "20")
+            @RequestParam(defaultValue = "20") int size
+    );
+
+    String DOCUMENT_LIST_SUCCESS = """
+            {
+              "isSuccess": true,
+              "code": "COMMON200",
+              "message": "성공입니다.",
+              "timestamp": "2026-11-14T17:30:00",
+              "result": {
+                "items": [{
+                  "savedSourceId": 12,
+                  "documentId": 31,
+                  "documentTitle": "2026년 청년 주거 지원사업 안내",
+                  "sourceName": "공공기관",
+                  "sourceUrl": "https://example.go.kr/document",
+                  "publishedAt": "2026-10-15",
+                  "sourceType": "GOVERNMENT",
+                  "reliabilityLevel": "HIGH",
+                  "saveMethod": "AUTO",
+                  "folderId": 3,
+                  "favorite": false,
+                  "savedAt": "2026-11-14T08:30:00Z"
+                }],
+                "page": 0,
+                "size": 20,
+                "totalElements": 1,
+                "totalPages": 1,
+                "hasNext": false
+              }
+            }
+            """;
+
+    String INVALID_REQUEST = """
+            {"isSuccess":false,"code":"COMMON400","message":"잘못된 요청입니다.","timestamp":"2026-11-14T17:30:00","result":{}}
+            """;
+
+    String UNAUTHORIZED = """
+            {"isSuccess":false,"code":"COMMON401","message":"인증이 필요합니다.","timestamp":"2026-11-14T17:30:00","result":{}}
+            """;
+
+    String FOLDER_NOT_FOUND = """
+            {"isSuccess":false,"code":"COMMON404","message":"요청한 리소스를 찾을 수 없습니다.","timestamp":"2026-11-14T17:30:00","result":{}}
+            """;
+}
