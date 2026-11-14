@@ -1,6 +1,7 @@
 package com.example.cast.user.service;
 import com.example.cast.user.entity.*;
 import com.example.cast.user.dto.request.UserInputs;
+import com.example.cast.source.service.SourceFolderInitializer;
 import com.example.cast.global.validation.RequestValidator;
 import com.example.cast.global.exception.BusinessException;
 import com.example.cast.global.code.GlobalErrorCode;
@@ -15,10 +16,15 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserWriteService {
     private final EntityManager em;
     private final RequestValidator validator;
+    private final SourceFolderInitializer folderInitializer;
     @Transactional
     public User create(UserInputs.Create input) {
         validator.validate(input);
-        User user = new User(input.email(), input.passwordHash()); em.persist(user); return user;
+        User user = new User(input.email(), input.passwordHash());
+        em.persist(user);
+        // Both the account and its three folders belong to the same transaction.
+        folderInitializer.initialize(user);
+        return user;
     }
     @Transactional
     public void changePassword(Long id, UserInputs.Password input) {

@@ -4,7 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import java.sql.*;
 import static org.junit.jupiter.api.Assertions.*;
-/** V1 원본을 바꾸지 않고 데이터/인용/저장 출처를 V7까지 보존하는지 검증한다. */
+/** V1 원본을 바꾸지 않고 기존 데이터를 최신 마이그레이션까지 보존하는지 검증한다. */
 class MigrationUpgradeTest {
     @Test void upgradesExistingDataAndDetachesAiReferences() throws Exception {
         CastPersistenceTestSafety.requireExplicitApproval();
@@ -22,7 +22,7 @@ class MigrationUpgradeTest {
                 s.executeUpdate("insert into document(doc_title) values ('legacy document')");
                 s.executeUpdate("insert into document_chunk(document_id,chunk_index,chunk_content,page_start,page_end,section_title) values (1,0,'chunk',2,3,'section')");
                 s.executeUpdate("insert into evidence(verification_id,chunk_id,evidence_text,evidence_relation) values (1,1,'original quote','SUPPORTS')");
-                s.executeUpdate("insert into saved_source(user_id,document_id,save_method) values (1,1,'MANUAL')");
+                s.executeUpdate("insert into saved_source(user_id,document_id,save_method,is_favorite) values (1,1,'MANUAL',true)");
                 s.executeUpdate("insert into retrieval_run(task_id,claim_id,run_type,search_query) values (1,1,'CLAIM_SEARCH','search')");
                 s.executeUpdate("insert into evaluation_case(question,expected_claims,relevant_chunk_ids) values ('legacy','[\"first\",\"second\"]'::jsonb,'[1]'::jsonb)");
             }
@@ -42,6 +42,19 @@ class MigrationUpgradeTest {
                 }
                 try(var rs=s.executeQuery("select ai_run_id from backend.verification")){assertTrue(rs.next());assertEquals(1,rs.getLong(1));}
                 try(var rs=s.executeQuery("select count(*) from backend.saved_source s join backend.document d on s.document_id=d.document_id")) {assertTrue(rs.next());assertEquals(1,rs.getInt(1));}
+                // V12 removes the favorite column/index without deleting legacy saved sources.
+                try(var rs=s.executeQuery("""
+                        SELECT count(*) FROM information_schema.columns
+                        WHERE table_schema='backend' AND table_name='saved_source' AND column_name='is_favorite'
+                        """)) {assertTrue(rs.next());assertEquals(0,rs.getInt(1));}
+                try(var rs=s.executeQuery("""
+                        SELECT count(*) FROM pg_indexes
+                        WHERE schemaname='backend' AND indexname='idx_saved_source_favorite'
+                        """)) {assertTrue(rs.next());assertEquals(0,rs.getInt(1));}
+                try(var rs=s.executeQuery("select user_id,document_id,save_method from backend.saved_source")) {
+                    assertTrue(rs.next());assertEquals(1,rs.getLong(1));assertEquals(1,rs.getLong(2));
+                    assertEquals("MANUAL",rs.getString(3));assertFalse(rs.next());
+                }
                 try(var rs=s.executeQuery("select expected_claims->0->>'content',expected_claims->1->>'content',expected_claims->0->>'type' from ai.evaluation_case")) {
                     assertTrue(rs.next());assertEquals("first",rs.getString(1));assertEquals("second",rs.getString(2));assertNull(rs.getString(3));
                 }

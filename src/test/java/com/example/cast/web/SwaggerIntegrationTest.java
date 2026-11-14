@@ -1,4 +1,4 @@
- package com.example.cast.web;
+package com.example.cast.web;
 
 import com.example.cast.auth.code.AuthErrorCode;
 import com.example.cast.auth.code.AuthSuccessCode;
@@ -57,10 +57,16 @@ class SwaggerIntegrationTest extends TestDatabaseSupport {
     }
 
     @Test
-    void specDocumentsAuthAndDoesNotRequireTokenForSignupOrLogin()
+    void specDocumentsAuthSourcesAndResearchAndDoesNotRequireTokenForSignupOrLogin()
             throws Exception {
 
         JsonNode spec = spec();
+
+        assertThat(spec.get("paths").size()).isEqualTo(11);
+        JsonNode researchOperation = spec.at("/paths/~1api~1research-tasks~1{taskId}/get");
+        assertThat(researchOperation.isMissingNode()).isFalse();
+        assertThat(researchOperation.at("/security/0/bearerAuth").isArray()).isTrue();
+
         assertThat(spec.at(
                 "/paths/~1api~1v1~1auth~1signup/post/security"
         ).isArray()).isTrue();
@@ -88,6 +94,137 @@ class SwaggerIntegrationTest extends TestDatabaseSupport {
         assertThat(spec.at(
                 "/servers/0/url"
         ).asText()).isEqualTo("/");
+    }
+
+    @Test
+    void overviewSwaggerHasBearerSecurityAndTypedResponse() throws Exception {
+        JsonNode spec = spec();
+        JsonNode operation = spec.at("/paths/~1api~1v1~1sources~1overview/get");
+
+        assertThat(operation.isMissingNode()).isFalse();
+        assertThat(operation.at("/security/0/bearerAuth").isArray()).isTrue();
+        assertThat(operation.at("/responses/200").isMissingNode()).isFalse();
+        assertThat(operation.at("/responses/401").isMissingNode()).isFalse();
+
+        String schemaRef = operation.at(
+                "/responses/200/content/application~1json/schema/$ref"
+        ).asText();
+        assertThat(schemaRef).startsWith("#/components/schemas/");
+        assertThat(spec.at(schemaRef.substring(1))
+                .at("/properties/result/$ref").asText())
+                .isEqualTo("#/components/schemas/SourceOverviewResponse");
+    }
+
+    @Test
+    void documentsSwaggerHasBearerAndTypedResponse() throws Exception {
+        JsonNode spec = spec();
+        JsonNode operation = spec.at("/paths/~1api~1v1~1sources~1documents/get");
+
+        assertThat(operation.isMissingNode()).isFalse();
+        assertThat(operation.at("/security/0/bearerAuth").isArray()).isTrue();
+        assertThat(operation.at("/parameters").isArray()).isTrue();
+        assertThat(operation.at("/parameters").toString())
+                .contains("folderId", "keyword", "sourceType", "saveMethod", "page", "size");
+        assertThat(operation.at("/parameters").toString()).doesNotContain("\"favorite\"");
+        assertThat(spec.path("components").path("schemas").toString())
+                .doesNotContain("\"favorite\"");
+        for (String code : new String[] {"200", "400", "401", "404"}) {
+            assertThat(operation.at("/responses/" + code).isMissingNode()).isFalse();
+        }
+
+        String responseSchemaRef = operation.at(
+                "/responses/200/content/application~1json/schema/$ref"
+        ).asString();
+        assertThat(responseSchemaRef).startsWith("#/components/schemas/");
+        assertThat(spec.at(responseSchemaRef.substring(1))
+                .at("/properties/result/$ref").asString())
+                .isEqualTo("#/components/schemas/SourceDocumentListResponse");
+    }
+
+    @Test
+    void policyChangesSwaggerHasBearerAndTypedResponse() throws Exception {
+        JsonNode spec = spec();
+        JsonNode operation = spec.at("/paths/~1api~1v1~1sources~1policy-changes/get");
+
+        assertThat(operation.isMissingNode()).isFalse();
+        assertThat(operation.at("/security/0/bearerAuth").isArray()).isTrue();
+        assertThat(operation.at("/parameters").toString())
+                .contains("keyword", "requiresRecheck", "page", "size");
+        for (String code : new String[] {"200", "400", "401"}) {
+            assertThat(operation.at("/responses/" + code).isMissingNode()).isFalse();
+        }
+        String schemaRef = operation.at(
+                "/responses/200/content/application~1json/schema/$ref"
+        ).asString();
+        assertThat(schemaRef).startsWith("#/components/schemas/");
+        assertThat(spec.at(schemaRef.substring(1))
+                .at("/properties/result/$ref").asString())
+                .isEqualTo("#/components/schemas/PolicyChangeListResponse");
+    }
+
+    @Test
+    void policyChangeDetailSwaggerHasBearerAndTypedResponse() throws Exception {
+        JsonNode spec = spec();
+        JsonNode operation = spec.at(
+                "/paths/~1api~1v1~1sources~1policy-changes~1{policyChangeId}/get");
+
+        assertThat(operation.isMissingNode()).isFalse();
+        assertThat(operation.at("/security/0/bearerAuth").isArray()).isTrue();
+        assertThat(operation.at("/parameters").toString()).contains("policyChangeId");
+        for (String code : new String[]{"200", "400", "401", "404"}) {
+            assertThat(operation.at("/responses/" + code).isMissingNode()).isFalse();
+        }
+        String schemaRef = operation.at(
+                "/responses/200/content/application~1json/schema/$ref").asString();
+        assertThat(schemaRef).startsWith("#/components/schemas/");
+        assertThat(spec.at(schemaRef.substring(1))
+                .at("/properties/result/$ref").asString())
+                .isEqualTo("#/components/schemas/PolicyChangeDetailResponse");
+    }
+
+    @Test
+    void documentDetailSwaggerHasBearerAndTypedResponse() throws Exception {
+        JsonNode spec = spec();
+        JsonNode operation = spec.at("/paths/~1api~1v1~1sources~1documents~1{savedSourceId}/get");
+
+        assertThat(operation.isMissingNode()).isFalse();
+        assertThat(operation.at("/security/0/bearerAuth").isArray()).isTrue();
+        assertThat(operation.at("/parameters").toString()).contains("savedSourceId");
+        for (String code : new String[] {"200", "400", "401", "404"}) {
+            assertThat(operation.at("/responses/" + code).isMissingNode()).isFalse();
+        }
+
+        String schemaRef = operation.at(
+                "/responses/200/content/application~1json/schema/$ref"
+        ).asString();
+        assertThat(schemaRef).startsWith("#/components/schemas/");
+        assertThat(spec.at(schemaRef.substring(1))
+                .at("/properties/result/$ref").asString())
+                .isEqualTo("#/components/schemas/SourceDocumentDetailResponse");
+    }
+
+    @Test
+    void scrapAndResearchEvidenceSwaggerHaveBearerAndTypedResponses() throws Exception {
+        JsonNode spec = spec();
+        JsonNode research = spec.at("/paths/~1api~1research-tasks~1{taskId}~1evidences/get");
+        assertThat(research.isMissingNode()).isFalse();
+        assertThat(research.at("/security/0/bearerAuth").isArray()).isTrue();
+        String researchSchema = research.at("/responses/200/content/application~1json/schema/$ref").asString();
+        assertThat(spec.at(researchSchema.substring(1)).at("/properties/result/$ref").asString())
+                .isEqualTo("#/components/schemas/ResearchEvidenceResponse");
+
+        JsonNode scraps = spec.at("/paths/~1api~1v1~1sources~1scraps");
+        assertThat(scraps.at("/get").isMissingNode()).isFalse();
+        assertThat(scraps.at("/post").isMissingNode()).isFalse();
+        assertThat(scraps.at("/get/security/0/bearerAuth").isArray()).isTrue();
+        assertThat(scraps.at("/post/security/0/bearerAuth").isArray()).isTrue();
+        String listSchema = scraps.at("/get/responses/200/content/application~1json/schema/$ref").asString();
+        assertThat(spec.at(listSchema.substring(1)).at("/properties/result/$ref").asString())
+                .isEqualTo("#/components/schemas/SentenceScrapListResponse");
+        JsonNode remove = spec.at("/paths/~1api~1v1~1sources~1scraps~1{scrapId}/delete");
+        assertThat(remove.isMissingNode()).isFalse();
+        assertThat(remove.at("/security/0/bearerAuth").isArray()).isTrue();
+        assertThat(remove.at("/parameters").toString()).contains("scrapId");
     }
 
     @Test
@@ -204,7 +341,7 @@ class SwaggerIntegrationTest extends TestDatabaseSupport {
                         "/components/schemas/SignupRequest/"
                                 + "properties/password/description"
                 ).asText()
-        ).contains("72");
+        ).contains("72바이트");
 
         assertThat(
                 spec.at(
