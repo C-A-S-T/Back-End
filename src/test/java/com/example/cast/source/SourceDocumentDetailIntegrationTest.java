@@ -118,6 +118,179 @@ class SourceDocumentDetailIntegrationTest extends TestDatabaseSupport {
                 .andExpect(status().isUnauthorized());
     }
 
+    @Test
+    void detailIncludesEvidenceRelatedResearchAndScraps() throws Exception {
+        var account = signup();
+        long documentId = newDocument("검증 연결 문서", true);
+        var linked = completeResearchWithEvidence(account.userId(), documentId, "지원 대상은 청년이다.");
+        long savedSourceId = save(account.userId(), documentId, null, "AUTO", false, linked.taskId());
+        long scrapId = newScrap(account.userId(), linked.evidenceId());
+
+        JsonNode result = detail(account, savedSourceId);
+        assertThat(result.path("verificationEvidenceTotalCount").asLong()).isEqualTo(1);
+        assertThat(result.path("verificationEvidenceHasMore").asBoolean()).isFalse();
+        JsonNode evidence = result.path("verificationEvidences").get(0);
+        assertThat(evidence.path("evidenceId").asLong()).isEqualTo(linked.evidenceId());
+        assertThat(evidence.path("claimContent").asString()).isEqualTo("지원 대상은 청년이다.");
+        assertThat(evidence.path("verificationStatus").asString()).isEqualTo("SUPPORTED");
+        assertThat(evidence.path("taskId").asLong()).isEqualTo(linked.taskId());
+        assertThat(evidence.path("pageStart").asInt()).isEqualTo(3);
+        assertThat(evidence.path("sectionTitle").asString()).isEqualTo("지원 대상");
+        assertThat(evidence.path("isScrapped").asBoolean()).isTrue();
+        assertThat(evidence.path("scrapId").asLong()).isEqualTo(scrapId);
+
+        assertThat(result.path("relatedResearchTotalCount").asLong()).isEqualTo(1);
+        JsonNode research = result.path("relatedResearches").get(0);
+        assertThat(research.path("taskId").asLong()).isEqualTo(linked.taskId());
+        assertThat(research.path("question").asString()).isEqualTo("테스트 연구 질문");
+        assertThat(research.path("summaryContent").asString()).isEqualTo("최종 답변 요약");
+        assertThat(research.path("completedAt").asString()).isNotBlank();
+
+        assertThat(result.path("scrappedSentenceTotalCount").asLong()).isEqualTo(1);
+        JsonNode scrap = result.path("scrappedSentences").get(0);
+        assertThat(scrap.path("scrapId").asLong()).isEqualTo(scrapId);
+        assertThat(scrap.path("evidenceId").asLong()).isEqualTo(linked.evidenceId());
+        assertThat(scrap.path("scrappedAt").asString()).isNotBlank();
+    }
+
+    @Test
+    void detailShowsOnlyLatestCompletedVerificationButKeepsEarlierScraps() throws Exception {
+        var account = signup();
+        long documentId = newDocument("재검증 문서", false);
+        var linked = completeResearchWithEvidence(account.userId(), documentId, "지원 금액 주장");
+        long savedSourceId = save(account.userId(), documentId, null, "AUTO", false, linked.taskId());
+        long oldScrap = newScrap(account.userId(), linked.evidenceId());
+
+        long recentVerification = jdbc.queryForObject("""
+                INSERT INTO backend.verification(claim_id, status, ver_attempt_number)
+                VALUES (?, 'CONTRADICTED', 2) RETURNING verification_id
+                """, Long.class, linked.claimId());
+        long newEvidence = jdbc.queryForObject("""
+                INSERT INTO backend.evidence(verification_id, document_id, evidence_text, evidence_relation)
+                VALUES (?, ?, '새 검증 문장', 'CONTRADICTS') RETURNING evidence_id
+                """, Long.class, recentVerification, documentId);
+        jdbc.update("""
+                INSERT INTO backend.verification(claim_id, status, ver_attempt_number)
+                VALUES (?, 'IN_PROGRESS', 3)
+                """, linked.claimId());
+
+        JsonNode result = detail(account, savedSourceId);
+        assertThat(result.path("verificationEvidenceTotalCount").asLong()).isEqualTo(1);
+        assertThat(result.path("verificationEvidences").get(0).path("evidenceId").asLong())
+                .isEqualTo(newEvidence);
+        assertThat(result.path("verificationEvidences").get(0).path("verificationStatus").asString())
+                .isEqualTo("CONTRADICTED");
+        assertThat(result.path("verificationEvidences").get(0).path("isScrapped").asBoolean())
+                .isFalse();
+        assertThat(result.path("scrappedSentenceTotalCount").asLong()).isEqualTo(1);
+        assertThat(result.path("scrappedSentences").get(0).path("scrapId").asLong())
+                .isEqualTo(oldScrap);
+        assertThat(result.path("scrappedSentences").get(0).path("evidenceId").asLong())
+                .isEqualTo(linked.evidenceId());
+    }
+
+    @Test
+    void detailNeverLeaksOtherUsersResearchOrScraps() throws Exception {
+        var owner = signup();
+        var other = signup();
+        long documentId = newDocument("공유 원문", false);
+        long savedSourceId = save(owner.userId(), documentId, null, "MANUAL", false, null);
+        var otherLinked = completeResearchWithEvidence(other.userId(), documentId, "타인 주장");
+        newScrap(other.userId(), otherLinked.evidenceId());
+
+        JsonNode ownerResult = detail(owner, savedSourceId);
+        assertThat(ownerResult.path("verificationEvidences").size()).isZero();
+        assertThat(ownerResult.path("verificationEvidenceTotalCount").asLong()).isZero();
+        assertThat(ownerResult.path("relatedResearches").size()).isZero();
+        assertThat(ownerResult.path("relatedResearchTotalCount").asLong()).isZero();
+        assertThat(ownerResult.path("scrappedSentences").size()).isZero();
+        assertThat(ownerResult.path("scrappedSentenceTotalCount").asLong()).isZero();
+    }
+
+    @Test
+    void detailCountsAllItemsButReturnsAtMostTwentyPerSection() throws Exception {
+        var account = signup();
+        long documentId = newDocument("대량 검증 문서", false);
+        var linked = completeResearchWithEvidence(account.userId(), documentId, "근거 다수 주장");
+        long savedSourceId = save(account.userId(), documentId, null, "AUTO", false, linked.taskId());
+        newScrap(account.userId(), linked.evidenceId());
+        long verificationId = jdbc.queryForObject("""
+                SELECT verification_id FROM backend.evidence WHERE evidence_id = ?
+                """, Long.class, linked.evidenceId());
+        for (int i = 1; i < 21; i++) {
+            long evidenceId = jdbc.queryForObject("""
+                    INSERT INTO backend.evidence(verification_id, document_id, evidence_text,
+                                                evidence_relation)
+                    VALUES (?, ?, ?, 'SUPPORTS') RETURNING evidence_id
+                    """, Long.class, verificationId, documentId, "추가 근거 " + i);
+            newScrap(account.userId(), evidenceId);
+        }
+        JsonNode result = detail(account, savedSourceId);
+        assertThat(result.path("verificationEvidenceTotalCount").asLong()).isEqualTo(21);
+        assertThat(result.path("verificationEvidences").size()).isEqualTo(20);
+        assertThat(result.path("verificationEvidenceHasMore").asBoolean()).isTrue();
+        assertThat(result.path("scrappedSentenceTotalCount").asLong()).isEqualTo(21);
+        assertThat(result.path("scrappedSentences").size()).isEqualTo(20);
+        assertThat(result.path("scrappedSentenceHasMore").asBoolean()).isTrue();
+        assertThat(result.path("relatedResearchTotalCount").asLong()).isEqualTo(1);
+    }
+
+    @Test
+    void detailIncludesOriginTaskEvenWhenItIsNotFinished() throws Exception {
+        var account = signup();
+        long documentId = newDocument("진행 중 원본", false);
+        long taskId = newResearchTask(account.userId());
+        long savedSourceId = save(account.userId(), documentId, null, "AUTO", false, taskId);
+
+        JsonNode result = detail(account, savedSourceId);
+        assertThat(result.path("relatedResearchTotalCount").asLong()).isEqualTo(1);
+        assertThat(result.path("relatedResearches").get(0).path("taskId").asLong())
+                .isEqualTo(taskId);
+        assertThat(result.path("relatedResearches").get(0).path("completedAt").isNull()).isTrue();
+        assertThat(result.path("verificationEvidenceTotalCount").asLong()).isZero();
+    }
+
+    private LinkedEvidence completeResearchWithEvidence(long userId, long documentId,
+            String claimText) {
+        long taskId = newResearchTask(userId);
+        jdbc.update("""
+                UPDATE backend.research_query SET research_title = '연관 리서치'
+                WHERE query_id = (SELECT query_id FROM backend.research_task WHERE task_id = ?)
+                """, taskId);
+        jdbc.update("""
+                UPDATE backend.research_task SET status = 'COMPLETED', completed_at = NOW()
+                WHERE task_id = ?
+                """, taskId);
+        long answerId = jdbc.queryForObject("""
+                INSERT INTO backend.answer(task_id, answer_content, summary_content, answer_status)
+                VALUES (?, '최종 답변', '최종 답변 요약', 'FINAL') RETURNING answer_id
+                """, Long.class, taskId);
+        long claimId = jdbc.queryForObject("""
+                INSERT INTO backend.claim(answer_id, claim_index, claim_content, claim_status)
+                VALUES (?, 0, ?, 'CONFIRMED') RETURNING claim_id
+                """, Long.class, answerId, claimText);
+        long verificationId = jdbc.queryForObject("""
+                INSERT INTO backend.verification(claim_id, status, ver_attempt_number)
+                VALUES (?, 'SUPPORTED', 1) RETURNING verification_id
+                """, Long.class, claimId);
+        long evidenceId = jdbc.queryForObject("""
+                INSERT INTO backend.evidence(verification_id, document_id, evidence_text,
+                                             evidence_relation, page_start, page_end, section_title)
+                VALUES (?, ?, '검증 근거 원문', 'SUPPORTS', 3, 3, '지원 대상')
+                RETURNING evidence_id
+                """, Long.class, verificationId, documentId);
+        return new LinkedEvidence(taskId, claimId, evidenceId);
+    }
+
+    private long newScrap(long userId, long evidenceId) {
+        return jdbc.queryForObject("""
+                INSERT INTO backend.sentence_scrap(user_id, evidence_id)
+                VALUES (?, ?) RETURNING scrap_id
+                """, Long.class, userId, evidenceId);
+    }
+
+    private record LinkedEvidence(long taskId, long claimId, long evidenceId) { }
+
     private AuthResponse signup() {
         return auth.signup(new SignupRequest(
                 UUID.randomUUID() + "@example.invalid", "SecurePassword123!"));

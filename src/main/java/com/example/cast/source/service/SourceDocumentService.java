@@ -3,11 +3,20 @@ package com.example.cast.source.service;
 import com.example.cast.global.code.GlobalErrorCode;
 import com.example.cast.global.exception.BusinessException;
 import com.example.cast.source.dto.response.SourceDocumentDetailResponse;
+import com.example.cast.source.dto.response.SourceDocumentDetailResponse.VerificationEvidenceItem;
+import com.example.cast.source.dto.response.SourceDocumentDetailResponse.RelatedResearchItem;
+import com.example.cast.source.dto.response.SourceDocumentDetailResponse.ScrappedSentenceItem;
 import com.example.cast.source.dto.response.SourceDocumentListResponse;
 import com.example.cast.source.dto.response.SourceDocumentListResponse.DocumentItem;
 import com.example.cast.source.entity.SavedSource;
+import com.example.cast.source.entity.SentenceScrap;
+import com.example.cast.source.repository.SentenceScrapRepository;
+import com.example.cast.source.repository.SourceDocumentDetailQueryRepository;
 import com.example.cast.source.repository.SourceDocumentRepository;
 import com.example.cast.source.repository.SourceFolderRepository;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -24,6 +33,8 @@ public class SourceDocumentService {
             Sort.Order.desc("createdAt"), Sort.Order.desc("savedSourceId"));
 
     private final SourceDocumentRepository documentRepository;
+    private final SourceDocumentDetailQueryRepository detailQuery;
+    private final SentenceScrapRepository scrapRepository;
     private final SourceFolderRepository folderRepository;
 
     public SourceDocumentListResponse listDocuments(Long userId, Long folderId, int page, int size) {
@@ -57,6 +68,41 @@ public class SourceDocumentService {
                 .orElseThrow(() -> new BusinessException(GlobalErrorCode.NOT_FOUND));
         var document = saved.getDocument();
         var originTask = saved.getOriginTask();
+        Long originTaskId = originTask == null ? null : originTask.getTaskId();
+
+        var evidenceSection = detailQuery.evidences(userId, document.getDocumentId());
+        var relatedSection = detailQuery.relatedResearches(userId, document.getDocumentId(), originTaskId);
+        var scrapSection = detailQuery.scraps(userId, document.getDocumentId());
+
+        var evidenceIds = evidenceSection.items().stream()
+                .map(e -> e.getEvidenceId()).toList();
+        Map<Long, SentenceScrap> scrapByEvidence = evidenceIds.isEmpty()
+                ? Map.of()
+                : scrapRepository.findByUser_UserIdAndEvidence_EvidenceIdIn(userId, evidenceIds)
+                        .stream().collect(Collectors.toMap(
+                                s -> s.getEvidence().getEvidenceId(), Function.identity()));
+
+        var evidenceItems = evidenceSection.items().stream().map(e -> {
+            var verification = e.getVerification();
+            var claim = verification.getClaim();
+            var scrap = scrapByEvidence.get(e.getEvidenceId());
+            return new VerificationEvidenceItem(
+                    e.getEvidenceId(), e.getEvidenceText(), e.getEvidenceRelation(),
+                    claim.getClaimId(), claim.getClaimContent(), verification.getStatus(),
+                    claim.getAnswer().getTask().getTaskId(), e.getPageStart(), e.getPageEnd(),
+                    e.getSectionTitle(), scrap != null,
+                    scrap == null ? null : scrap.getScrapId());
+        }).toList();
+        var relatedItems = relatedSection.items().stream()
+                .map(row -> new RelatedResearchItem(row.taskId(), row.researchTitle(),
+                        row.question(), row.summaryContent(), row.completedAt()))
+                .toList();
+        var scrapItems = scrapSection.items().stream().map(s -> {
+            var evidence = s.getEvidence();
+            return new ScrappedSentenceItem(s.getScrapId(), evidence.getEvidenceId(),
+                    evidence.getEvidenceText(), evidence.getVerification().getClaim().getClaimContent(),
+                    s.getCreatedAt());
+        }).toList();
 
         return new SourceDocumentDetailResponse(
                 saved.getSavedSourceId(),
@@ -73,8 +119,11 @@ public class SourceDocumentService {
                 saved.getSaveMethod(),
                 saved.getFolderId(),
                 saved.isFavorite(),
-                originTask == null ? null : originTask.getTaskId(),
-                saved.getCreatedAt()
+                originTaskId,
+                saved.getCreatedAt(),
+                evidenceItems, evidenceSection.totalCount(), evidenceSection.hasMore(),
+                relatedItems, relatedSection.totalCount(), relatedSection.hasMore(),
+                scrapItems, scrapSection.totalCount(), scrapSection.hasMore()
         );
     }
 

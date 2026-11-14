@@ -74,7 +74,11 @@ public interface SourceDocumentApi {
             description = """
                     로그인 사용자가 보관한 자동·수동 저장 문서의 메타데이터를 조회합니다.
                     savedSourceId는 사용자의 저장 기록 ID이며, 다른 사용자 소유 기록은 404를 반환합니다.
-                    원문 전체, AI 문서 요약, 최신 버전 판정 및 검증 근거는 반환하지 않습니다.
+                    문서 메타데이터, 최신 완료 검증 근거, 관련 리서치 및 사용자 스크랩 문장을 반환합니다.
+                    각 관련 목록은 최대 20건이며 전체 건수와 추가 존재 여부를 함께 제공합니다.
+                    진행 중인 최초 관련 리서치는 포함할 수 있지만 그 밖의 관련 리서치는 완료된 작업만 반환합니다.
+                    과거 검증 시도에서 스크랩한 문장은 검증 근거 목록에서 빠져도 스크랩 목록에 유지됩니다.
+                    원문 전체, AI 문서 자체 요약 및 최신 버전 판정은 반환하지 않습니다.
                     originTaskId는 해당 문서를 최초 저장하게 된 연구 작업 ID이며 없으면 null입니다.
                     """,
             security = @SecurityRequirement(name = SwaggerConfig.JWT_SCHEME)
@@ -164,7 +168,41 @@ public interface SourceDocumentApi {
                 "folderId": null,
                 "favorite": false,
                 "originTaskId": 7,
-                "savedAt": "2026-11-14T08:30:00Z"
+                "savedAt": "2026-11-14T08:30:00Z",
+                "verificationEvidences": [{
+                  "evidenceId": 45,
+                  "evidenceText": "월 최대 20만 원을 지원한다.",
+                  "evidenceRelation": "SUPPORTS",
+                  "claimId": 18,
+                  "claimContent": "청년월세 지원금은 월 최대 20만 원이다.",
+                  "verificationStatus": "SUPPORTED",
+                  "taskId": 7,
+                  "pageStart": 3,
+                  "pageEnd": 3,
+                  "sectionTitle": "지원 금액",
+                  "isScrapped": true,
+                  "scrapId": 5
+                }],
+                "verificationEvidenceTotalCount": 1,
+                "verificationEvidenceHasMore": false,
+                "relatedResearches": [{
+                  "taskId": 7,
+                  "researchTitle": "2026 청년월세 지원 조건",
+                  "question": "청년월세 지원금은 얼마인가요?",
+                  "summaryContent": "월 최대 20만 원의 지원을 받을 수 있습니다.",
+                  "completedAt": "2026-11-14T10:00:00Z"
+                }],
+                "relatedResearchTotalCount": 1,
+                "relatedResearchHasMore": false,
+                "scrappedSentences": [{
+                  "scrapId": 5,
+                  "evidenceId": 45,
+                  "evidenceText": "월 최대 20만 원을 지원한다.",
+                  "claimContent": "청년월세 지원금은 월 최대 20만 원이다.",
+                  "scrappedAt": "2026-11-14T11:00:00Z"
+                }],
+                "scrappedSentenceTotalCount": 1,
+                "scrappedSentenceHasMore": false
               }
             }
             """;
