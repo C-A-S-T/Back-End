@@ -43,7 +43,7 @@ public class SourceDocumentService {
     private final SourceFolderRepository folderRepository;
 
     public SourceDocumentListResponse listDocuments(Long userId, Long folderId,
-            String keyword, SourceType sourceType, SaveMethod saveMethod, Boolean favorite,
+            String keyword, SourceType sourceType, SaveMethod saveMethod,
             int page, int size) {
         if (page < 0 || size < 1 || size > MAX_PAGE_SIZE || (folderId != null && folderId <= 0)) {
             throw new BusinessException(GlobalErrorCode.INVALID_REQUEST);
@@ -63,7 +63,7 @@ public class SourceDocumentService {
 
         var pageable = PageRequest.of(page, size, SAVED_ORDER);
         Page<SavedSource> saved = searchRepository.search(userId, folderId,
-                normalizedKeyword, sourceType, saveMethod, favorite, pageable);
+                normalizedKeyword, sourceType, saveMethod, pageable);
 
         return new SourceDocumentListResponse(
                 saved.getContent().stream().map(this::toItem).toList(),
@@ -131,7 +131,6 @@ public class SourceDocumentService {
                 document.getReliabilityLevel(),
                 saved.getSaveMethod(),
                 saved.getFolderId(),
-                saved.isFavorite(),
                 originTaskId,
                 saved.getCreatedAt(),
                 evidenceItems, evidenceSection.totalCount(), evidenceSection.hasMore(),
@@ -153,7 +152,6 @@ public class SourceDocumentService {
                 document.getReliabilityLevel(),
                 saved.getSaveMethod(),
                 saved.getFolderId(),
-                saved.isFavorite(),
                 saved.getCreatedAt()
         );
     }

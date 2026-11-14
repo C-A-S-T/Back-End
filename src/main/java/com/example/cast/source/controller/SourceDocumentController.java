@@ -25,13 +25,12 @@ public class SourceDocumentController implements SourceDocumentApi {
             String keyword,
             com.example.cast.document.entity.SourceType sourceType,
             com.example.cast.source.entity.SaveMethod saveMethod,
-            Boolean favorite,
             int page,
             int size
     ) {
         return ApiResponse.success(CommonSuccessCode.OK,
                 documentService.listDocuments(user.userId(), folderId, keyword,
-                        sourceType, saveMethod, favorite, page, size));
+                        sourceType, saveMethod, page, size));
     }
 
     @Override

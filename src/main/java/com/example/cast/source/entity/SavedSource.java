@@ -65,9 +65,6 @@ public class SavedSource extends BaseTimeEntity {
     )
     private SaveMethod saveMethod;
 
-    @Column(name = "is_favorite", nullable = false)
-    private boolean favorite = false;
-
     private SavedSource(
             User user,
             Document document,
@@ -110,9 +107,5 @@ public class SavedSource extends BaseTimeEntity {
 
     public void moveToFolder(Long folderId) {
         this.folderId = folderId;
-    }
-
-    public void updateFavorite(boolean favorite) {
-        this.favorite = favorite;
     }
 }

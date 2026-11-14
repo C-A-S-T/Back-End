@@ -28,7 +28,7 @@ public interface SourceDocumentApi {
                     folderId를 생략하면 미분류 및 기존 폴더 문서를 포함한 전체 목록을 반환합니다.
                     folderId를 전달하면 사용자가 소유한 고정 폴더의 문서만 반환합니다.
                     keyword는 문서 제목 또는 발행 기관에 대한 대소문자 무시 부분 검색입니다(최대 100자).
-                    sourceType, saveMethod, favorite 필터를 선택적으로 조합할 수 있습니다. 모든 조건은 AND로 결합합니다.
+                    sourceType, saveMethod 필터를 선택적으로 조합할 수 있습니다. 모든 조건은 AND로 결합합니다.
                     page는 0부터 시작하며 size는 1~100입니다. 기본값은 page=0, size=20입니다.
                     """,
             security = @SecurityRequirement(name = SwaggerConfig.JWT_SCHEME)
@@ -71,8 +71,6 @@ public interface SourceDocumentApi {
             @RequestParam(required = false) com.example.cast.document.entity.SourceType sourceType,
             @Parameter(description = "최초 저장 방식 필터", example = "MANUAL")
             @RequestParam(required = false) com.example.cast.source.entity.SaveMethod saveMethod,
-            @Parameter(description = "즐겨찾기 여부 필터 (생략 시 전체)", example = "true")
-            @RequestParam(required = false) Boolean favorite,
             @Parameter(description = "0부터 시작하는 페이지 번호", example = "0")
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "페이지당 문서 수 (1~100)", example = "20")
@@ -144,7 +142,6 @@ public interface SourceDocumentApi {
                   "reliabilityLevel": "HIGH",
                   "saveMethod": "AUTO",
                   "folderId": 3,
-                  "favorite": false,
                   "savedAt": "2026-11-14T08:30:00Z"
                 }],
                 "page": 0,
@@ -176,7 +173,6 @@ public interface SourceDocumentApi {
                 "reliabilityLevel": "HIGH",
                 "saveMethod": "AUTO",
                 "folderId": null,
-                "favorite": false,
                 "originTaskId": 7,
                 "savedAt": "2026-11-14T08:30:00Z",
                 "verificationEvidences": [{

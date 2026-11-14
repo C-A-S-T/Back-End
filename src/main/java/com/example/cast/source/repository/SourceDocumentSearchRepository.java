@@ -27,14 +27,14 @@ public class SourceDocumentSearchRepository {
     private final EntityManager em;
 
     public Page<SavedSource> search(Long userId, Long folderId, String keyword,
-            SourceType sourceType, SaveMethod saveMethod, Boolean favorite, Pageable pageable) {
+            SourceType sourceType, SaveMethod saveMethod, Pageable pageable) {
         CriteriaBuilder cb = em.getCriteriaBuilder();
 
         CriteriaQuery<Long> countQuery = cb.createQuery(Long.class);
         Root<SavedSource> countRoot = countQuery.from(SavedSource.class);
         Join<SavedSource, Document> countDocument = countRoot.join("document", JoinType.INNER);
         countQuery.select(cb.count(countRoot)).where(predicates(cb, countRoot, countDocument,
-                userId, folderId, keyword, sourceType, saveMethod, favorite));
+                userId, folderId, keyword, sourceType, saveMethod));
         long total = em.createQuery(countQuery).getSingleResult();
         if (total == 0 || pageable.getOffset() >= total) {
             return new PageImpl<>(List.of(), pageable, total);
@@ -47,7 +47,7 @@ public class SourceDocumentSearchRepository {
         root.fetch("document", JoinType.INNER);
         contentQuery.select(root)
                 .where(predicates(cb, root, document,
-                        userId, folderId, keyword, sourceType, saveMethod, favorite))
+                        userId, folderId, keyword, sourceType, saveMethod))
                 .orderBy(cb.desc(root.get("createdAt")), cb.desc(root.get("savedSourceId")));
 
         List<SavedSource> items = em.createQuery(contentQuery)
@@ -59,7 +59,7 @@ public class SourceDocumentSearchRepository {
 
     private Predicate[] predicates(CriteriaBuilder cb, Root<SavedSource> root,
             Join<SavedSource, Document> document, Long userId, Long folderId,
-            String keyword, SourceType sourceType, SaveMethod saveMethod, Boolean favorite) {
+            String keyword, SourceType sourceType, SaveMethod saveMethod) {
         List<Predicate> conditions = new ArrayList<>();
         conditions.add(cb.equal(root.get("user").get("userId"), userId));
         if (folderId != null) {
@@ -70,9 +70,6 @@ public class SourceDocumentSearchRepository {
         }
         if (saveMethod != null) {
             conditions.add(cb.equal(root.get("saveMethod"), saveMethod));
-        }
-        if (favorite != null) {
-            conditions.add(cb.equal(root.get("favorite"), favorite));
         }
         if (keyword != null) {
             String pattern = "%" + escapeLike(keyword.toLowerCase(Locale.ROOT)) + "%";

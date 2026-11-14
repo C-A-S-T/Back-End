@@ -29,7 +29,6 @@ public record SourceDocumentListResponse(
             @Schema(description = "문서 신뢰도", nullable = true, example = "HIGH") ReliabilityLevel reliabilityLevel,
             @Schema(description = "최초 저장 방식", example = "AUTO") SaveMethod saveMethod,
             @Schema(description = "배정된 폴더 ID. null이면 미분류", nullable = true) Long folderId,
-            @Schema(description = "즐겨찾기 여부", example = "false") boolean favorite,
             @Schema(description = "최초 저장 시각(UTC)", example = "2026-11-14T08:30:00Z") Instant savedAt
     ) { }
 }

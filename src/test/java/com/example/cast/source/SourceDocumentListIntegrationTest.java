@@ -61,11 +61,11 @@ class SourceDocumentListIntegrationTest extends TestDatabaseSupport {
         long fourth = newDocument("unclassified MANUAL");
         long foreign = newDocument("other user's document");
 
-        save(owner.userId(), first, housing, "AUTO", false, "2026-11-01T00:00:00Z");
-        save(owner.userId(), second, housing, "MANUAL", true, "2026-11-02T00:00:00Z");
-        save(owner.userId(), third, gov, "AUTO", false, "2026-11-03T00:00:00Z");
-        save(owner.userId(), fourth, null, "MANUAL", false, "2026-11-04T00:00:00Z");
-        save(other.userId(), foreign, otherHousing, "AUTO", false, "2026-11-05T00:00:00Z");
+        save(owner.userId(), first, housing, "AUTO", "2026-11-01T00:00:00Z");
+        save(owner.userId(), second, housing, "MANUAL", "2026-11-02T00:00:00Z");
+        save(owner.userId(), third, gov, "AUTO", "2026-11-03T00:00:00Z");
+        save(owner.userId(), fourth, null, "MANUAL", "2026-11-04T00:00:00Z");
+        save(other.userId(), foreign, otherHousing, "AUTO", "2026-11-05T00:00:00Z");
 
         var page0 = fetch(owner, null, 0, 2);
         assertThat(page0.path("totalElements").asLong()).isEqualTo(4);
@@ -79,7 +79,7 @@ class SourceDocumentListIntegrationTest extends TestDatabaseSupport {
         assertThat(housingPage.path("totalElements").asLong()).isEqualTo(2);
         assertThat(housingPage.path("items").get(0).path("documentId").asLong()).isEqualTo(second);
         assertThat(housingPage.path("items").get(0).path("saveMethod").asString()).isEqualTo("MANUAL");
-        assertThat(housingPage.path("items").get(0).path("favorite").asBoolean()).isTrue();
+        assertThat(housingPage.path("items").get(0).has("favorite")).isFalse();
         assertThat(housingPage.path("items").get(1).path("documentId").asLong()).isEqualTo(first);
         assertThat(housingPage.path("items").get(1).path("saveMethod").asString()).isEqualTo("AUTO");
 
@@ -128,9 +128,9 @@ class SourceDocumentListIntegrationTest extends TestDatabaseSupport {
         long titleMatch = newDocument("Youth Housing Guide", "기관A", "REPORT");
         long sourceMatch = newDocument("일반 안내", "청년지원센터", "GOVERNMENT");
         long foreign = newDocument("Youth Private", "청년지원센터", "GOVERNMENT");
-        save(owner.userId(), titleMatch, null, "MANUAL", false, "2026-11-01T00:00:00Z");
-        save(owner.userId(), sourceMatch, null, "AUTO", false, "2026-11-02T00:00:00Z");
-        save(other.userId(), foreign, null, "AUTO", false, "2026-11-03T00:00:00Z");
+        save(owner.userId(), titleMatch, null, "MANUAL", "2026-11-01T00:00:00Z");
+        save(owner.userId(), sourceMatch, null, "AUTO", "2026-11-02T00:00:00Z");
+        save(other.userId(), foreign, null, "AUTO", "2026-11-03T00:00:00Z");
 
         var english = fetchWithFilter(owner, "keyword", " yOuTh ");
         assertThat(english.path("totalElements").asLong()).isEqualTo(1);
@@ -146,9 +146,9 @@ class SourceDocumentListIntegrationTest extends TestDatabaseSupport {
         long underscore = newDocument("정책_2026");
         long ordinary = newDocument("정책X2026");
         long percent = newDocument("100% 지원");
-        save(owner.userId(), underscore, null, "MANUAL", false, "2026-11-01T00:00:00Z");
-        save(owner.userId(), ordinary, null, "MANUAL", false, "2026-11-02T00:00:00Z");
-        save(owner.userId(), percent, null, "MANUAL", false, "2026-11-03T00:00:00Z");
+        save(owner.userId(), underscore, null, "MANUAL", "2026-11-01T00:00:00Z");
+        save(owner.userId(), ordinary, null, "MANUAL", "2026-11-02T00:00:00Z");
+        save(owner.userId(), percent, null, "MANUAL", "2026-11-03T00:00:00Z");
 
         var underscoreResult = fetchWithFilter(owner, "keyword", "_");
         assertThat(underscoreResult.path("totalElements").asLong()).isEqualTo(1);
@@ -161,36 +161,32 @@ class SourceDocumentListIntegrationTest extends TestDatabaseSupport {
     }
 
     @Test
-    void combinedFiltersPreserveFolderSecurityAndDistinguishFalseFromAbsent() throws Exception {
+    void combinedFiltersPreserveFolderSecurityAndExcludeNonMatchingDocuments() throws Exception {
         var owner = signup();
         var other = signup();
         long housing = folderId(owner.userId(), "HOUSING");
         long government = folderId(owner.userId(), "GOV_SUPPORT");
         long foreignFolder = folderId(other.userId(), "HOUSING");
         long selected = newDocument("청년 정책 A", "센터", "GOVERNMENT");
-        long notFavorite = newDocument("청년 정책 B", "센터", "GOVERNMENT");
+        long differentMethod = newDocument("청년 정책 B", "센터", "GOVERNMENT");
         long notType = newDocument("청년 연구", "센터", "REPORT");
         long notFolder = newDocument("청년 정책 C", "센터", "GOVERNMENT");
-        save(owner.userId(), selected, housing, "AUTO", true, "2026-11-01T00:00:00Z");
-        save(owner.userId(), notFavorite, housing, "AUTO", false, "2026-11-02T00:00:00Z");
-        save(owner.userId(), notType, housing, "MANUAL", true, "2026-11-03T00:00:00Z");
-        save(owner.userId(), notFolder, government, "AUTO", true, "2026-11-04T00:00:00Z");
+        save(owner.userId(), selected, housing, "AUTO", "2026-11-01T00:00:00Z");
+        save(owner.userId(), differentMethod, housing, "MANUAL", "2026-11-02T00:00:00Z");
+        save(owner.userId(), notType, housing, "MANUAL", "2026-11-03T00:00:00Z");
+        save(owner.userId(), notFolder, government, "AUTO", "2026-11-04T00:00:00Z");
 
         var request = get("/api/v1/sources/documents")
                 .header("Authorization", bearer(owner))
                 .param("folderId", String.valueOf(housing))
                 .param("keyword", "청년")
                 .param("sourceType", "GOVERNMENT")
-                .param("saveMethod", "AUTO")
-                .param("favorite", "true");
+                .param("saveMethod", "AUTO");
         var response = mvc.perform(request).andExpect(status().isOk()).andReturn();
         var result = mapper.readTree(response.getResponse().getContentAsByteArray()).path("result");
         assertThat(result.path("totalElements").asLong()).isEqualTo(1);
         assertThat(result.path("items").get(0).path("documentId").asLong()).isEqualTo(selected);
 
-        var falseResult = fetchWithFilter(owner, "favorite", "false");
-        assertThat(falseResult.path("totalElements").asLong()).isEqualTo(1);
-        assertThat(falseResult.path("items").get(0).path("documentId").asLong()).isEqualTo(notFavorite);
         assertThat(fetch(owner, null, 0, 20).path("totalElements").asLong()).isEqualTo(4);
 
         mvc.perform(get("/api/v1/sources/documents")
@@ -206,10 +202,10 @@ class SourceDocumentListIntegrationTest extends TestDatabaseSupport {
         long second = newDocument("청년 안내 2");
         long third = newDocument("청년 안내 3");
         long unrelated = newDocument("일반 안내");
-        save(owner.userId(), first, null, "MANUAL", false, "2026-11-01T00:00:00Z");
-        save(owner.userId(), second, null, "MANUAL", false, "2026-11-02T00:00:00Z");
-        save(owner.userId(), third, null, "MANUAL", false, "2026-11-03T00:00:00Z");
-        save(owner.userId(), unrelated, null, "MANUAL", false, "2026-11-04T00:00:00Z");
+        save(owner.userId(), first, null, "MANUAL", "2026-11-01T00:00:00Z");
+        save(owner.userId(), second, null, "MANUAL", "2026-11-02T00:00:00Z");
+        save(owner.userId(), third, null, "MANUAL", "2026-11-03T00:00:00Z");
+        save(owner.userId(), unrelated, null, "MANUAL", "2026-11-04T00:00:00Z");
 
         var firstPage = fetchFilteredPage(owner, "청년", 0, 2);
         assertThat(firstPage.path("totalElements").asLong()).isEqualTo(3);
@@ -232,8 +228,7 @@ class SourceDocumentListIntegrationTest extends TestDatabaseSupport {
         for (String[] param : new String[][] {
                 {"keyword", "가".repeat(101)},
                 {"sourceType", "UNKNOWN"},
-                {"saveMethod", "INVALID"},
-                {"favorite", "notBoolean"}
+                {"saveMethod", "INVALID"}
         }) {
             mvc.perform(get("/api/v1/sources/documents")
                             .header("Authorization", bearer(owner))
@@ -307,13 +302,13 @@ class SourceDocumentListIntegrationTest extends TestDatabaseSupport {
     }
 
     private void save(long userId, long documentId, Long folderId,
-                      String method, boolean favorite, String savedAt) {
+                      String method, String savedAt) {
         var timestamp = Timestamp.from(Instant.parse(savedAt));
         jdbc.update("""
                 INSERT INTO backend.saved_source
-                    (user_id, document_id, folder_id, save_method, is_favorite,
+                    (user_id, document_id, folder_id, save_method,
                      created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, userId, documentId, folderId, method, favorite, timestamp, timestamp);
+                VALUES (?, ?, ?, ?, ?, ?)
+                """, userId, documentId, folderId, method, timestamp, timestamp);
     }
 }

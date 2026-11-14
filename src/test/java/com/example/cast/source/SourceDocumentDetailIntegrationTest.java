@@ -38,7 +38,7 @@ class SourceDocumentDetailIntegrationTest extends TestDatabaseSupport {
         long folderId = folderId(account.userId(), "HOUSING");
         long taskId = newResearchTask(account.userId());
         long documentId = newDocument("가상 청년 지원 정책", true);
-        long savedSourceId = save(account.userId(), documentId, folderId, "AUTO", true, taskId);
+        long savedSourceId = save(account.userId(), documentId, folderId, "AUTO", taskId);
 
         JsonNode result = detail(account, savedSourceId);
         assertThat(result.path("savedSourceId").asLong()).isEqualTo(savedSourceId);
@@ -54,7 +54,7 @@ class SourceDocumentDetailIntegrationTest extends TestDatabaseSupport {
         assertThat(result.path("reliabilityLevel").asString()).isEqualTo("HIGH");
         assertThat(result.path("saveMethod").asString()).isEqualTo("AUTO");
         assertThat(result.path("folderId").asLong()).isEqualTo(folderId);
-        assertThat(result.path("favorite").asBoolean()).isTrue();
+        assertThat(result.has("favorite")).isFalse();
         assertThat(result.path("originTaskId").asLong()).isEqualTo(taskId);
         assertThat(result.path("savedAt").asString()).isNotBlank();
     }
@@ -63,7 +63,7 @@ class SourceDocumentDetailIntegrationTest extends TestDatabaseSupport {
     void manualSavedDocumentKeepsNullableFieldsNull() throws Exception {
         var account = signup();
         long documentId = newDocument("수동 저장 문서", false);
-        long savedSourceId = save(account.userId(), documentId, null, "MANUAL", false, null);
+        long savedSourceId = save(account.userId(), documentId, null, "MANUAL", null);
 
         JsonNode result = detail(account, savedSourceId);
         assertThat(result.path("documentTitle").asString()).isEqualTo("수동 저장 문서");
@@ -78,7 +78,7 @@ class SourceDocumentDetailIntegrationTest extends TestDatabaseSupport {
         assertThat(result.path("reliabilityLevel").isNull()).isTrue();
         assertThat(result.path("folderId").isNull()).isTrue();
         assertThat(result.path("originTaskId").isNull()).isTrue();
-        assertThat(result.path("favorite").asBoolean()).isFalse();
+        assertThat(result.has("favorite")).isFalse();
     }
 
     @Test
@@ -86,7 +86,7 @@ class SourceDocumentDetailIntegrationTest extends TestDatabaseSupport {
         var owner = signup();
         var other = signup();
         long documentId = newDocument("타인의 문서", false);
-        long savedSourceId = save(owner.userId(), documentId, null, "MANUAL", false, null);
+        long savedSourceId = save(owner.userId(), documentId, null, "MANUAL", null);
 
         mvc.perform(get("/api/v1/sources/documents/{savedSourceId}", savedSourceId)
                         .header("Authorization", bearer(other)))
@@ -123,7 +123,7 @@ class SourceDocumentDetailIntegrationTest extends TestDatabaseSupport {
         var account = signup();
         long documentId = newDocument("검증 연결 문서", true);
         var linked = completeResearchWithEvidence(account.userId(), documentId, "지원 대상은 청년이다.");
-        long savedSourceId = save(account.userId(), documentId, null, "AUTO", false, linked.taskId());
+        long savedSourceId = save(account.userId(), documentId, null, "AUTO", linked.taskId());
         long scrapId = newScrap(account.userId(), linked.evidenceId());
 
         JsonNode result = detail(account, savedSourceId);
@@ -158,7 +158,7 @@ class SourceDocumentDetailIntegrationTest extends TestDatabaseSupport {
         var account = signup();
         long documentId = newDocument("재검증 문서", false);
         var linked = completeResearchWithEvidence(account.userId(), documentId, "지원 금액 주장");
-        long savedSourceId = save(account.userId(), documentId, null, "AUTO", false, linked.taskId());
+        long savedSourceId = save(account.userId(), documentId, null, "AUTO", linked.taskId());
         long oldScrap = newScrap(account.userId(), linked.evidenceId());
 
         long recentVerification = jdbc.queryForObject("""
@@ -194,7 +194,7 @@ class SourceDocumentDetailIntegrationTest extends TestDatabaseSupport {
         var owner = signup();
         var other = signup();
         long documentId = newDocument("공유 원문", false);
-        long savedSourceId = save(owner.userId(), documentId, null, "MANUAL", false, null);
+        long savedSourceId = save(owner.userId(), documentId, null, "MANUAL", null);
         var otherLinked = completeResearchWithEvidence(other.userId(), documentId, "타인 주장");
         newScrap(other.userId(), otherLinked.evidenceId());
 
@@ -212,7 +212,7 @@ class SourceDocumentDetailIntegrationTest extends TestDatabaseSupport {
         var account = signup();
         long documentId = newDocument("대량 검증 문서", false);
         var linked = completeResearchWithEvidence(account.userId(), documentId, "근거 다수 주장");
-        long savedSourceId = save(account.userId(), documentId, null, "AUTO", false, linked.taskId());
+        long savedSourceId = save(account.userId(), documentId, null, "AUTO", linked.taskId());
         newScrap(account.userId(), linked.evidenceId());
         long verificationId = jdbc.queryForObject("""
                 SELECT verification_id FROM backend.evidence WHERE evidence_id = ?
@@ -240,7 +240,7 @@ class SourceDocumentDetailIntegrationTest extends TestDatabaseSupport {
         var account = signup();
         long documentId = newDocument("진행 중 원본", false);
         long taskId = newResearchTask(account.userId());
-        long savedSourceId = save(account.userId(), documentId, null, "AUTO", false, taskId);
+        long savedSourceId = save(account.userId(), documentId, null, "AUTO", taskId);
 
         JsonNode result = detail(account, savedSourceId);
         assertThat(result.path("relatedResearchTotalCount").asLong()).isEqualTo(1);
@@ -349,11 +349,11 @@ class SourceDocumentDetailIntegrationTest extends TestDatabaseSupport {
     }
 
     private long save(long userId, long documentId, Long folderId,
-                      String method, boolean favorite, Long originTaskId) {
+                      String method, Long originTaskId) {
         return jdbc.queryForObject("""
                 INSERT INTO backend.saved_source
-                    (user_id, document_id, folder_id, save_method, is_favorite, origin_task_id)
-                VALUES (?, ?, ?, ?, ?, ?) RETURNING saved_source_id
-                """, Long.class, userId, documentId, folderId, method, favorite, originTaskId);
+                    (user_id, document_id, folder_id, save_method, origin_task_id)
+                VALUES (?, ?, ?, ?, ?) RETURNING saved_source_id
+                """, Long.class, userId, documentId, folderId, method, originTaskId);
     }
 }

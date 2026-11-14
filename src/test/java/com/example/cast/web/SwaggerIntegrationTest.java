@@ -124,7 +124,10 @@ class SwaggerIntegrationTest extends TestDatabaseSupport {
         assertThat(operation.at("/security/0/bearerAuth").isArray()).isTrue();
         assertThat(operation.at("/parameters").isArray()).isTrue();
         assertThat(operation.at("/parameters").toString())
-                .contains("folderId", "keyword", "sourceType", "saveMethod", "favorite", "page", "size");
+                .contains("folderId", "keyword", "sourceType", "saveMethod", "page", "size");
+        assertThat(operation.at("/parameters").toString()).doesNotContain("\"favorite\"");
+        assertThat(spec.path("components").path("schemas").toString())
+                .doesNotContain("\"favorite\"");
         for (String code : new String[] {"200", "400", "401", "404"}) {
             assertThat(operation.at("/responses/" + code).isMissingNode()).isFalse();
         }
