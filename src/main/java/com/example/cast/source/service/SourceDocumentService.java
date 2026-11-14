@@ -1,5 +1,6 @@
 package com.example.cast.source.service;
 
+import com.example.cast.document.entity.SourceType;
 import com.example.cast.global.code.GlobalErrorCode;
 import com.example.cast.global.exception.BusinessException;
 import com.example.cast.source.dto.response.SourceDocumentDetailResponse;
@@ -9,10 +10,12 @@ import com.example.cast.source.dto.response.SourceDocumentDetailResponse.Scrappe
 import com.example.cast.source.dto.response.SourceDocumentListResponse;
 import com.example.cast.source.dto.response.SourceDocumentListResponse.DocumentItem;
 import com.example.cast.source.entity.SavedSource;
+import com.example.cast.source.entity.SaveMethod;
 import com.example.cast.source.entity.SentenceScrap;
 import com.example.cast.source.repository.SentenceScrapRepository;
 import com.example.cast.source.repository.SourceDocumentDetailQueryRepository;
 import com.example.cast.source.repository.SourceDocumentRepository;
+import com.example.cast.source.repository.SourceDocumentSearchRepository;
 import com.example.cast.source.repository.SourceFolderRepository;
 import java.util.Map;
 import java.util.function.Function;
@@ -29,16 +32,27 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class SourceDocumentService {
     private static final int MAX_PAGE_SIZE = 100;
+    private static final int MAX_KEYWORD_LENGTH = 100;
     private static final Sort SAVED_ORDER = Sort.by(
             Sort.Order.desc("createdAt"), Sort.Order.desc("savedSourceId"));
 
     private final SourceDocumentRepository documentRepository;
+    private final SourceDocumentSearchRepository searchRepository;
     private final SourceDocumentDetailQueryRepository detailQuery;
     private final SentenceScrapRepository scrapRepository;
     private final SourceFolderRepository folderRepository;
 
-    public SourceDocumentListResponse listDocuments(Long userId, Long folderId, int page, int size) {
+    public SourceDocumentListResponse listDocuments(Long userId, Long folderId,
+            String keyword, SourceType sourceType, SaveMethod saveMethod, Boolean favorite,
+            int page, int size) {
         if (page < 0 || size < 1 || size > MAX_PAGE_SIZE || (folderId != null && folderId <= 0)) {
+            throw new BusinessException(GlobalErrorCode.INVALID_REQUEST);
+        }
+        String normalizedKeyword = keyword == null ? null : keyword.trim();
+        if (normalizedKeyword != null && normalizedKeyword.isEmpty()) {
+            normalizedKeyword = null;
+        }
+        if (normalizedKeyword != null && normalizedKeyword.length() > MAX_KEYWORD_LENGTH) {
             throw new BusinessException(GlobalErrorCode.INVALID_REQUEST);
         }
         if (folderId != null &&
@@ -48,9 +62,8 @@ public class SourceDocumentService {
         }
 
         var pageable = PageRequest.of(page, size, SAVED_ORDER);
-        Page<SavedSource> saved = folderId == null
-                ? documentRepository.findByUser_UserId(userId, pageable)
-                : documentRepository.findByUser_UserIdAndFolderId(userId, folderId, pageable);
+        Page<SavedSource> saved = searchRepository.search(userId, folderId,
+                normalizedKeyword, sourceType, saveMethod, favorite, pageable);
 
         return new SourceDocumentListResponse(
                 saved.getContent().stream().map(this::toItem).toList(),

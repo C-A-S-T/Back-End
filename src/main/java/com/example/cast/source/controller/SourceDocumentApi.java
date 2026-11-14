@@ -27,6 +27,8 @@ public interface SourceDocumentApi {
                     로그인 사용자의 자동·수동 저장 문서를 최신 저장순으로 조회합니다.
                     folderId를 생략하면 미분류 및 기존 폴더 문서를 포함한 전체 목록을 반환합니다.
                     folderId를 전달하면 사용자가 소유한 고정 폴더의 문서만 반환합니다.
+                    keyword는 문서 제목 또는 발행 기관에 대한 대소문자 무시 부분 검색입니다(최대 100자).
+                    sourceType, saveMethod, favorite 필터를 선택적으로 조합할 수 있습니다. 모든 조건은 AND로 결합합니다.
                     page는 0부터 시작하며 size는 1~100입니다. 기본값은 page=0, size=20입니다.
                     """,
             security = @SecurityRequirement(name = SwaggerConfig.JWT_SCHEME)
@@ -40,7 +42,7 @@ public interface SourceDocumentApi {
                             examples = @ExampleObject(name = "DOCUMENT_LIST_SUCCESS", value = DOCUMENT_LIST_SUCCESS))
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "400", description = "페이지, 크기, 폴더 ID 요청값 오류",
+                    responseCode = "400", description = "검색어, 필터, 페이지, 크기, 폴더 ID 요청값 오류",
                     content = @Content(mediaType = "application/json",
                             schema = @Schema(implementation = ApiResponse.class),
                             examples = @ExampleObject(name = "INVALID_REQUEST", value = INVALID_REQUEST))
@@ -63,6 +65,14 @@ public interface SourceDocumentApi {
             @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser user,
             @Parameter(description = "고정 폴더 ID (생략 시 전체 조회)", example = "3")
             @RequestParam(required = false) Long folderId,
+            @Parameter(description = "문서 제목·발행 기관 통합 검색어 (부분 일치, 최대 100자)", example = "청년")
+            @RequestParam(required = false) String keyword,
+            @Parameter(description = "출처 유형 필터", example = "GOVERNMENT")
+            @RequestParam(required = false) com.example.cast.document.entity.SourceType sourceType,
+            @Parameter(description = "최초 저장 방식 필터", example = "MANUAL")
+            @RequestParam(required = false) com.example.cast.source.entity.SaveMethod saveMethod,
+            @Parameter(description = "즐겨찾기 여부 필터 (생략 시 전체)", example = "true")
+            @RequestParam(required = false) Boolean favorite,
             @Parameter(description = "0부터 시작하는 페이지 번호", example = "0")
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "페이지당 문서 수 (1~100)", example = "20")

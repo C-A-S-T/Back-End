@@ -121,6 +121,147 @@ class SourceDocumentListIntegrationTest extends TestDatabaseSupport {
                 .andExpect(status().isUnauthorized());
     }
 
+    @Test
+    void keywordMatchesTitleOrSourceNameWithoutCaseSensitivityOrUserLeak() throws Exception {
+        var owner = signup();
+        var other = signup();
+        long titleMatch = newDocument("Youth Housing Guide", "기관A", "REPORT");
+        long sourceMatch = newDocument("일반 안내", "청년지원센터", "GOVERNMENT");
+        long foreign = newDocument("Youth Private", "청년지원센터", "GOVERNMENT");
+        save(owner.userId(), titleMatch, null, "MANUAL", false, "2026-11-01T00:00:00Z");
+        save(owner.userId(), sourceMatch, null, "AUTO", false, "2026-11-02T00:00:00Z");
+        save(other.userId(), foreign, null, "AUTO", false, "2026-11-03T00:00:00Z");
+
+        var english = fetchWithFilter(owner, "keyword", " yOuTh ");
+        assertThat(english.path("totalElements").asLong()).isEqualTo(1);
+        assertThat(english.path("items").get(0).path("documentId").asLong()).isEqualTo(titleMatch);
+        var korean = fetchWithFilter(owner, "keyword", "청년");
+        assertThat(korean.path("totalElements").asLong()).isEqualTo(1);
+        assertThat(korean.path("items").get(0).path("documentId").asLong()).isEqualTo(sourceMatch);
+    }
+
+    @Test
+    void wildcardCharactersAreLiteralAndBlankKeywordMeansNoSearch() throws Exception {
+        var owner = signup();
+        long underscore = newDocument("정책_2026");
+        long ordinary = newDocument("정책X2026");
+        long percent = newDocument("100% 지원");
+        save(owner.userId(), underscore, null, "MANUAL", false, "2026-11-01T00:00:00Z");
+        save(owner.userId(), ordinary, null, "MANUAL", false, "2026-11-02T00:00:00Z");
+        save(owner.userId(), percent, null, "MANUAL", false, "2026-11-03T00:00:00Z");
+
+        var underscoreResult = fetchWithFilter(owner, "keyword", "_");
+        assertThat(underscoreResult.path("totalElements").asLong()).isEqualTo(1);
+        assertThat(underscoreResult.path("items").get(0).path("documentId").asLong()).isEqualTo(underscore);
+        var percentResult = fetchWithFilter(owner, "keyword", "%");
+        assertThat(percentResult.path("totalElements").asLong()).isEqualTo(1);
+        assertThat(percentResult.path("items").get(0).path("documentId").asLong()).isEqualTo(percent);
+        assertThat(fetchWithFilter(owner, "keyword", "   ")
+                .path("totalElements").asLong()).isEqualTo(3);
+    }
+
+    @Test
+    void combinedFiltersPreserveFolderSecurityAndDistinguishFalseFromAbsent() throws Exception {
+        var owner = signup();
+        var other = signup();
+        long housing = folderId(owner.userId(), "HOUSING");
+        long government = folderId(owner.userId(), "GOV_SUPPORT");
+        long foreignFolder = folderId(other.userId(), "HOUSING");
+        long selected = newDocument("청년 정책 A", "센터", "GOVERNMENT");
+        long notFavorite = newDocument("청년 정책 B", "센터", "GOVERNMENT");
+        long notType = newDocument("청년 연구", "센터", "REPORT");
+        long notFolder = newDocument("청년 정책 C", "센터", "GOVERNMENT");
+        save(owner.userId(), selected, housing, "AUTO", true, "2026-11-01T00:00:00Z");
+        save(owner.userId(), notFavorite, housing, "AUTO", false, "2026-11-02T00:00:00Z");
+        save(owner.userId(), notType, housing, "MANUAL", true, "2026-11-03T00:00:00Z");
+        save(owner.userId(), notFolder, government, "AUTO", true, "2026-11-04T00:00:00Z");
+
+        var request = get("/api/v1/sources/documents")
+                .header("Authorization", bearer(owner))
+                .param("folderId", String.valueOf(housing))
+                .param("keyword", "청년")
+                .param("sourceType", "GOVERNMENT")
+                .param("saveMethod", "AUTO")
+                .param("favorite", "true");
+        var response = mvc.perform(request).andExpect(status().isOk()).andReturn();
+        var result = mapper.readTree(response.getResponse().getContentAsByteArray()).path("result");
+        assertThat(result.path("totalElements").asLong()).isEqualTo(1);
+        assertThat(result.path("items").get(0).path("documentId").asLong()).isEqualTo(selected);
+
+        var falseResult = fetchWithFilter(owner, "favorite", "false");
+        assertThat(falseResult.path("totalElements").asLong()).isEqualTo(1);
+        assertThat(falseResult.path("items").get(0).path("documentId").asLong()).isEqualTo(notFavorite);
+        assertThat(fetch(owner, null, 0, 20).path("totalElements").asLong()).isEqualTo(4);
+
+        mvc.perform(get("/api/v1/sources/documents")
+                        .header("Authorization", bearer(owner))
+                        .param("folderId", String.valueOf(foreignFolder)).param("keyword", "청년"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void filteredPaginationAndEmptyResultsHaveCorrectMetadata() throws Exception {
+        var owner = signup();
+        long first = newDocument("청년 안내 1");
+        long second = newDocument("청년 안내 2");
+        long third = newDocument("청년 안내 3");
+        long unrelated = newDocument("일반 안내");
+        save(owner.userId(), first, null, "MANUAL", false, "2026-11-01T00:00:00Z");
+        save(owner.userId(), second, null, "MANUAL", false, "2026-11-02T00:00:00Z");
+        save(owner.userId(), third, null, "MANUAL", false, "2026-11-03T00:00:00Z");
+        save(owner.userId(), unrelated, null, "MANUAL", false, "2026-11-04T00:00:00Z");
+
+        var firstPage = fetchFilteredPage(owner, "청년", 0, 2);
+        assertThat(firstPage.path("totalElements").asLong()).isEqualTo(3);
+        assertThat(firstPage.path("totalPages").asInt()).isEqualTo(2);
+        assertThat(firstPage.path("hasNext").asBoolean()).isTrue();
+        assertThat(firstPage.path("items").get(0).path("documentId").asLong()).isEqualTo(third);
+        assertThat(firstPage.path("items").get(1).path("documentId").asLong()).isEqualTo(second);
+        var nextPage = fetchFilteredPage(owner, "청년", 1, 2);
+        assertThat(nextPage.path("totalElements").asLong()).isEqualTo(3);
+        assertThat(nextPage.path("hasNext").asBoolean()).isFalse();
+        assertThat(nextPage.path("items").get(0).path("documentId").asLong()).isEqualTo(first);
+        var empty = fetchWithFilter(owner, "keyword", "없는검색어");
+        assertThat(empty.path("items").size()).isZero();
+        assertThat(empty.path("totalElements").asLong()).isZero();
+    }
+
+    @Test
+    void invalidSearchParametersReturn400() throws Exception {
+        var owner = signup();
+        for (String[] param : new String[][] {
+                {"keyword", "가".repeat(101)},
+                {"sourceType", "UNKNOWN"},
+                {"saveMethod", "INVALID"},
+                {"favorite", "notBoolean"}
+        }) {
+            mvc.perform(get("/api/v1/sources/documents")
+                            .header("Authorization", bearer(owner))
+                            .param(param[0], param[1]))
+                    .andExpect(status().isBadRequest());
+        }
+    }
+
+    private JsonNode fetchWithFilter(AuthResponse account, String key, String value) throws Exception {
+        return fetchFilteredPage(account, key.equals("keyword") ? value : null, 0, 20, key, value);
+    }
+
+    private JsonNode fetchFilteredPage(AuthResponse account, String keyword, int page, int size)
+            throws Exception {
+        return fetchFilteredPage(account, keyword, page, size, null, null);
+    }
+
+    private JsonNode fetchFilteredPage(AuthResponse account, String keyword, int page, int size,
+            String extraKey, String extraValue) throws Exception {
+        var request = get("/api/v1/sources/documents")
+                .header("Authorization", bearer(account))
+                .param("page", String.valueOf(page)).param("size", String.valueOf(size));
+        if (keyword != null) request.param("keyword", keyword);
+        if (extraKey != null && !extraKey.equals("keyword")) request.param(extraKey, extraValue);
+        var response = mvc.perform(request).andExpect(status().isOk()).andReturn();
+        return mapper.readTree(response.getResponse().getContentAsByteArray()).path("result");
+    }
+
     private AuthResponse signup() {
         return auth.signup(new SignupRequest(
                 UUID.randomUUID() + "@example.invalid", "SecurePassword123!"));
@@ -151,14 +292,18 @@ class SourceDocumentListIntegrationTest extends TestDatabaseSupport {
     }
 
     private long newDocument(String title) {
+        return newDocument(title, "공공기관", "GOVERNMENT");
+    }
+
+    private long newDocument(String title, String sourceName, String sourceType) {
         return jdbc.queryForObject("""
                 INSERT INTO backend.document
                     (ai_document_id, doc_title, source_name, source_url, published_at,
                      source_type, reliability_level)
-                VALUES (?, ?, '공공기관', 'https://example.go.kr/document',
-                        DATE '2026-10-15', 'GOVERNMENT', 'HIGH')
+                VALUES (?, ?, ?, 'https://example.go.kr/document',
+                        DATE '2026-10-15', ?, 'HIGH')
                 RETURNING document_id
-                """, Long.class, AI_DOCUMENT_ID.incrementAndGet(), title);
+                """, Long.class, AI_DOCUMENT_ID.incrementAndGet(), title, sourceName, sourceType);
     }
 
     private void save(long userId, long documentId, Long folderId,

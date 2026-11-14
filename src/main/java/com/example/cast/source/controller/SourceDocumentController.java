@@ -22,11 +22,16 @@ public class SourceDocumentController implements SourceDocumentApi {
     public ResponseEntity<ApiResponse<SourceDocumentListResponse>> listDocuments(
             @AuthenticationPrincipal AuthenticatedUser user,
             Long folderId,
+            String keyword,
+            com.example.cast.document.entity.SourceType sourceType,
+            com.example.cast.source.entity.SaveMethod saveMethod,
+            Boolean favorite,
             int page,
             int size
     ) {
         return ApiResponse.success(CommonSuccessCode.OK,
-                documentService.listDocuments(user.userId(), folderId, page, size));
+                documentService.listDocuments(user.userId(), folderId, keyword,
+                        sourceType, saveMethod, favorite, page, size));
     }
 
     @Override
