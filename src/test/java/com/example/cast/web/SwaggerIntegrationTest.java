@@ -62,7 +62,7 @@ class SwaggerIntegrationTest extends TestDatabaseSupport {
 
         JsonNode spec = spec();
 
-        assertThat(spec.get("paths").size()).isEqualTo(9);
+        assertThat(spec.get("paths").size()).isEqualTo(10);
         JsonNode researchOperation = spec.at("/paths/~1api~1research-tasks~1{taskId}/get");
         assertThat(researchOperation.isMissingNode()).isFalse();
         assertThat(researchOperation.at("/security/0/bearerAuth").isArray()).isTrue();
@@ -136,6 +136,27 @@ class SwaggerIntegrationTest extends TestDatabaseSupport {
         assertThat(spec.at(responseSchemaRef.substring(1))
                 .at("/properties/result/$ref").asString())
                 .isEqualTo("#/components/schemas/SourceDocumentListResponse");
+    }
+
+    @Test
+    void policyChangesSwaggerHasBearerAndTypedResponse() throws Exception {
+        JsonNode spec = spec();
+        JsonNode operation = spec.at("/paths/~1api~1v1~1sources~1policy-changes/get");
+
+        assertThat(operation.isMissingNode()).isFalse();
+        assertThat(operation.at("/security/0/bearerAuth").isArray()).isTrue();
+        assertThat(operation.at("/parameters").toString())
+                .contains("keyword", "requiresRecheck", "page", "size");
+        for (String code : new String[] {"200", "400", "401"}) {
+            assertThat(operation.at("/responses/" + code).isMissingNode()).isFalse();
+        }
+        String schemaRef = operation.at(
+                "/responses/200/content/application~1json/schema/$ref"
+        ).asString();
+        assertThat(schemaRef).startsWith("#/components/schemas/");
+        assertThat(spec.at(schemaRef.substring(1))
+                .at("/properties/result/$ref").asString())
+                .isEqualTo("#/components/schemas/PolicyChangeListResponse");
     }
 
     @Test
