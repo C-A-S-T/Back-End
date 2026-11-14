@@ -19,6 +19,7 @@ public class SourceDocumentDetailQueryRepository {
     private static final int DETAIL_LIMIT = 20;
     private final EntityManager em;
 
+    @SuppressWarnings("JpaQlInspection")
     private static final String EVIDENCE_FILTER = """
             WHERE e.document.documentId = :documentId
               AND q.user.userId = :userId
@@ -32,6 +33,7 @@ public class SourceDocumentDetailQueryRepository {
               )
             """;
 
+    @SuppressWarnings("JpaQlInspection")
     private static final String RELATED_FILTER = """
             WHERE q.user.userId = :userId
               AND (t.taskId = :originTaskId OR (
