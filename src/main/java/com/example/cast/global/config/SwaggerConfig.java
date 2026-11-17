@@ -17,8 +17,8 @@ public class SwaggerConfig {
     @Bean
     public OpenAPI castOpenApi() {
         return new OpenAPI()
-                .info(new Info().title("C.A.S.T. 인증 API").version("v1")
-                        .description("이메일 회원가입 및 로그인 API. 회원가입과 로그인은 인증 없이 호출합니다. "
+                .info(new Info().title("C.A.S.T. API").version("v1")
+                        .description("인증 및 출처보관함 API입니다. 회원가입과 로그인은 인증 없이 호출합니다. "
                                 + "성공 응답의 accessToken은 60분 동안 유효합니다. "
                                 + "보호 API의 Authorize에는 Bearer 접두사 없이 토큰 값만 입력합니다."))
                 .addServersItem(new Server().url("/"))

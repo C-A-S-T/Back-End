@@ -38,6 +38,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
@@ -69,6 +70,7 @@ class AuthIntegrationTest extends TestDatabaseSupport {
     @Autowired ObjectMapper mapper;
     @Autowired AuthService auth;
     @Autowired UserRepository users;
+    @Autowired JdbcTemplate jdbcTemplate;
     @Autowired UserWriteService userWriter;
     @Autowired PasswordEncoder passwords;
     @Autowired JwtDecoder decoder;
@@ -95,6 +97,30 @@ class AuthIntegrationTest extends TestDatabaseSupport {
                     principal.userId()
             );
         }
+    }
+
+    @Test
+    void signupCreatesThreeDefaultSourceFolders() throws Exception {
+        MvcResult result = credentials("signup", uniqueEmail(), PASSWORD);
+        assertThat(result.getResponse().getStatus()).isEqualTo(201);
+
+        long userId = body(result).get("result").get("userId").asLong();
+        List<String> folders = jdbcTemplate.queryForList(
+                """
+                SELECT folder_category || ':' || folder_name
+                FROM backend.source_folder
+                WHERE user_id = ?
+                """,
+                String.class,
+                userId
+        );
+
+        assertThat(folders).hasSize(3)
+                .containsExactlyInAnyOrder(
+                        "HOUSING:\uCCAD\uC57D\u00B7\uC8FC\uAC70",
+                        "GOV_SUPPORT:\uC815\uBD80 \uC9C0\uC6D0\uC815\uCC45",
+                        "EDUCATION:\uAD50\uC721"
+                );
     }
 
     @Test
@@ -653,6 +679,11 @@ class AuthIntegrationTest extends TestDatabaseSupport {
                         )
         ).andExpect(status().isUnauthorized());
 
+        // Default folders reference this user, so remove test-owned folders first.
+        jdbcTemplate.update(
+                "DELETE FROM backend.source_folder WHERE user_id = ?",
+                account.userId()
+        );
         users.deleteById(account.userId());
 
         mvc.perform(
