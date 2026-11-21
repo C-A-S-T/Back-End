@@ -32,6 +32,7 @@ class SwaggerIntegrationTest extends TestDatabaseSupport {
 
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper mapper;
+    @Autowired com.example.cast.auth.service.AuthService auth;
 
     @Test
     void swaggerUiAndConfigurationArePublic() throws Exception {
@@ -62,7 +63,7 @@ class SwaggerIntegrationTest extends TestDatabaseSupport {
 
         JsonNode spec = spec();
 
-        assertThat(spec.get("paths").size()).isEqualTo(12);
+        assertThat(spec.get("paths").size()).isEqualTo(13);
         JsonNode researchOperation = spec.at("/paths/~1api~1research-tasks~1{taskId}/get");
         assertThat(researchOperation.isMissingNode()).isFalse();
         assertThat(researchOperation.at("/security/0/bearerAuth").isArray()).isTrue();
@@ -94,6 +95,50 @@ class SwaggerIntegrationTest extends TestDatabaseSupport {
         assertThat(spec.at(
                 "/servers/0/url"
         ).asText()).isEqualTo("/");
+    }
+
+    @Test
+    void policyComparisonSwaggerHasBearerAndTypedResponse() throws Exception {
+        JsonNode spec = spec();
+        JsonNode operation = spec.at(
+                "/paths/~1api~1v1~1policy-comparisons~1{policyKey}/get");
+
+        assertThat(operation.isMissingNode()).isFalse();
+        assertThat(spec.at("/paths/~1api~1v1~1policy-comparisons~1{policyKey}~1preview")
+                .isMissingNode()).isTrue();
+        assertThat(operation.at("/security/0/bearerAuth").isArray()).isTrue();
+        assertThat(operation.at("/parameters").toString()).contains("policyKey");
+        for (String code : new String[] {"200", "401", "404", "502", "503", "504"}) {
+            assertThat(operation.at("/responses/" + code).isMissingNode()).isFalse();
+        }
+        String schemaRef = operation.at(
+                "/responses/200/content/application~1json/schema/$ref").asString();
+        assertThat(schemaRef).startsWith("#/components/schemas/");
+        assertThat(spec.at(schemaRef.substring(1))
+                .at("/properties/result/$ref").asString())
+                .isEqualTo("#/components/schemas/PolicyComparisonResponse");
+    }
+
+    @Test
+    void policyComparisonRequiresJwtAndReturns503WhenAiDisabled() throws Exception {
+        String url = "/api/v1/policy-comparisons/seoul-youth-rent";
+
+        mvc.perform(get(url))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("COMMON401"));
+
+        mvc.perform(get(url).header("Authorization", "Bearer invalid-token"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("COMMON401"));
+
+        String token = auth.signup(
+                new com.example.cast.auth.dto.request.SignupRequest(
+                        UUID.randomUUID() + "@example.invalid", "PolicyTestPassword123!"))
+                .accessToken();
+
+        mvc.perform(get(url).header("Authorization", "Bearer " + token))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("COMMON503"));
     }
 
     @Test
