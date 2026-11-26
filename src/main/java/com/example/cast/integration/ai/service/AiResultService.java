@@ -1,4 +1,5 @@
 package com.example.cast.integration.ai.service;
+import com.example.cast.integration.ai.config.AiDispatchProtectionProperties;
 import com.example.cast.integration.ai.dto.*;
 import com.example.cast.integration.ai.repository.AiJobRepository;
 import com.example.cast.claim.entity.*;
@@ -30,6 +31,7 @@ public class AiResultService {
     private final RequestValidator validator;
     private final EntityManager em;
     private final ObjectMapper mapper;
+    private final AiDispatchProtectionProperties dispatchProtection;
 
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public AiResultReceipt accept(Long taskId, AiResultRequest request) {
@@ -38,6 +40,13 @@ public class AiResultService {
         var task = tasks.findLockedById(taskId).orElseThrow(() -> new BusinessException(GlobalErrorCode.NOT_FOUND));
         var job = jobs.findByTaskTaskId(taskId).orElseThrow(() -> new BusinessException(GlobalErrorCode.DATA_CONFLICT));
         if (!job.getJobId().equals(request.jobId())) throw new BusinessException(GlobalErrorCode.DATA_CONFLICT);
+        // 기존 보호 Job 및 전환 시각 이전 Job의 콜백은 중복 수신을 포함해 모두 거부한다.
+        var gate = dispatchProtection.requiredGate();
+        if (gate.protectedJobIds().contains(job.getJobId())
+                || job.getCreatedAt() == null
+                || !job.getCreatedAt().isAfter(gate.cutoverAt())) {
+            throw new BusinessException(GlobalErrorCode.DATA_CONFLICT);
+        }
         String hash = fingerprint(request);
         if (job.getResultHash() != null) {
             if (!job.getResultHash().equals(hash)) throw new BusinessException(GlobalErrorCode.DATA_CONFLICT);
