@@ -1,4 +1,6 @@
 package com.example.cast.integration.ai.service;
+import com.example.cast.integration.ai.config.AiDispatchProtectionProperties;
+import com.example.cast.integration.ai.config.AiProperties;
 import com.example.cast.integration.ai.dto.AiJobRequest;
 import com.example.cast.integration.ai.entity.AiJob;
 import com.example.cast.integration.ai.repository.AiJobRepository;
@@ -7,6 +9,7 @@ import com.example.cast.research.entity.ResearchTaskStatus;
 import com.example.cast.global.code.GlobalErrorCode;
 import com.example.cast.global.exception.BusinessException;
 import com.example.cast.global.validation.RequestValidator;
+import jakarta.annotation.PostConstruct;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -26,6 +29,16 @@ public class AiJobService {
     private final RequestValidator validator;
     private final EntityManager em;
     private final Clock clock;
+    private final AiProperties aiProperties;
+    private final AiDispatchProtectionProperties dispatchProtection;
+
+    /** 보호 설정이 없으면 자동 Dispatcher 활성화를 시작 단계부터 거부한다. */
+    @PostConstruct
+    void verifyProtectionForEnabledDispatcher() {
+        if (aiProperties.enabled()) {
+            dispatchProtection.requiredGate();
+        }
+    }
 
     /** HTTP 호출 없이 작업만 등록한다. 반복 호출은 동일 jobId를 반환한다. */
     @Transactional
@@ -42,7 +55,9 @@ public class AiJobService {
         return job.request();
     }
     public List<AiJobRequest> pending() {
-        return jobs.pending(PageRequest.of(0, 20)).stream().map(AiJob::request).toList();
+        var gate = dispatchProtection.requiredGate();
+        return jobs.pendingEligible(gate.cutoverAt(), gate.protectedJobIds(), PageRequest.of(0, 20))
+                .stream().map(AiJob::request).toList();
     }
     @Transactional
     public void markDispatched(AiJobRequest request) {

@@ -33,3 +33,6 @@ cast:
     base-url: ${CAST_AI_BASE_URL:}
     api-token: ${CAST_AI_API_TOKEN:}
     callback-token: ${CAST_AI_CALLBACK_TOKEN:}
+    dispatch-protection:
+      cutover-at: ${CAST_AI_CUTOVER_AT:}
+      protected-job-ids: ${CAST_AI_PROTECTED_JOB_IDS:}

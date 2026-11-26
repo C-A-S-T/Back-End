@@ -5,3 +5,6 @@ cast:
     base-url: ""
     api-token: ""
     callback-token: ""
+    dispatch-protection:
+      cutover-at: "2020-01-01T00:00:00Z"
+      protected-job-ids: "00000000-0000-0000-0000-000000000001"

@@ -5,5 +5,5 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 /** AI 통신 설정과 전송 대기 작업 스케줄러. */
 @Configuration
 @EnableScheduling
-@EnableConfigurationProperties(AiProperties.class)
+@EnableConfigurationProperties({AiProperties.class, AiDispatchProtectionProperties.class})
 public class AiIntegrationConfig {}
