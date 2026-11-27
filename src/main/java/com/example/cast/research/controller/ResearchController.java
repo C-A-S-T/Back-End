@@ -8,6 +8,8 @@ import com.example.cast.global.response.ApiResponse;
 import com.example.cast.research.dto.request.ResearchInputs;
 import com.example.cast.research.dto.response.ResearchEvidenceResponse;
 import com.example.cast.research.dto.response.ResearchResultResponse;
+import com.example.cast.research.dto.response.ResearchListResponse;
+import com.example.cast.research.service.ResearchListService;
 import com.example.cast.research.dto.response.ResearchStartResponse;
 import com.example.cast.research.service.ResearchEvidenceService;
 import com.example.cast.research.service.ResearchResultService;
@@ -27,6 +29,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Tag(
@@ -42,6 +45,7 @@ public class ResearchController {
     private final ResearchResultService researchResultService;
     private final ResearchStartService researchStartService;
     private final ResearchEvidenceService evidenceService;
+    private final ResearchListService researchListService;
 
     @Operation(
             summary = "AI 연구 시작",
@@ -108,6 +112,41 @@ public class ResearchController {
         return ApiResponse.success(
                 CommonSuccessCode.OK,
                 evidenceService.getEvidences(userId, taskId)
+        );
+    }
+
+    @Operation(
+            summary = "List research tasks",
+            description = "Returns only the authenticated user's research tasks, newest first."
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "Research history retrieved",
+                    useReturnTypeSchema = true
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "400",
+                    description = "Invalid pagination parameters"
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "401",
+                    description = "Authentication required"
+            )
+    })
+    @GetMapping
+    public ResponseEntity<ApiResponse<ResearchListResponse>> getList(
+            @Parameter(description = "Zero-based page number", example = "0")
+            @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Page size (1-100)", example = "20")
+            @RequestParam(defaultValue = "20") int size,
+            Authentication authentication
+    ) {
+        Long userId = authenticatedUserId(authentication);
+
+        return ApiResponse.success(
+                CommonSuccessCode.OK,
+                researchListService.getList(userId, page, size)
         );
     }
 

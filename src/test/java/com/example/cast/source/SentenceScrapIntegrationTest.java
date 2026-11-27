@@ -43,7 +43,17 @@ class SentenceScrapIntegrationTest extends TestDatabaseSupport {
         var user = signup();
         var f = fixture(user, "청년 지원금 안내", "지원금은 월 20만 원이다.",
                 "지원금은 월 30만 원이다.", "CONTRADICTED", "GOVERNMENT");
+        jdbc.update("""
+                UPDATE backend.verification SET verification_reason = ?
+                WHERE verification_id = (
+                    SELECT verification_id FROM backend.evidence
+                    WHERE evidence_id = ?
+                )
+                """, "original verification reason", f.evidenceId());
+
         JsonNode before = evidences(user, f.taskId());
+        assertThat(before.path("claims").get(0).path("reason").asString())
+                .isEqualTo("original verification reason");
         assertThat(before.path("claims").size()).isEqualTo(1);
         JsonNode item = before.path("claims").get(0).path("evidences").get(0);
         assertThat(item.path("evidenceId").asLong()).isEqualTo(f.evidenceId());
@@ -201,8 +211,8 @@ class SentenceScrapIntegrationTest extends TestDatabaseSupport {
                 SELECT claim_id FROM backend.verification WHERE verification_id = ?
                 """, Long.class, oldVerification);
         long newVerification = jdbc.queryForObject("""
-                INSERT INTO backend.verification(claim_id,status,ver_attempt_number)
-                VALUES (?,'SUPPORTED',2) RETURNING verification_id
+                INSERT INTO backend.verification(claim_id,status,ver_attempt_number,verification_reason)
+                VALUES (?,'SUPPORTED',2,'latest reason') RETURNING verification_id
                 """, Long.class, claimId);
         long recentEvidence = jdbc.queryForObject("""
                 INSERT INTO backend.evidence(verification_id,document_id,evidence_text,evidence_relation)
@@ -210,6 +220,8 @@ class SentenceScrapIntegrationTest extends TestDatabaseSupport {
                 """, Long.class, newVerification, f.documentId());
         JsonNode claims = evidences(user, f.taskId()).path("claims");
         assertThat(claims.get(0).path("verificationStatus").asString()).isEqualTo("SUPPORTED");
+        assertThat(claims.get(0).path("reason").asString())
+                .isEqualTo("latest reason");
         JsonNode current = claims.get(0).path("evidences");
         assertThat(current.size()).isEqualTo(1);
         assertThat(current.get(0).path("evidenceId").asLong()).isEqualTo(recentEvidence);
@@ -237,6 +249,25 @@ class SentenceScrapIntegrationTest extends TestDatabaseSupport {
                 .content("{\"evidenceId\":1}"))
                 .andExpect(status().isUnauthorized());
         mvc.perform(delete("/api/v1/sources/scraps/1")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void missingVerificationReasonRemainsNull() throws Exception {
+        var user = signup();
+        var f = fixture(user, "Test document", "Test evidence",
+                "Test claim", "SUPPORTED", "REPORT");
+
+        JsonNode claims = evidences(user, f.taskId()).path("claims");
+
+        assertThat(claims.size()).isEqualTo(1);
+        JsonNode claim = claims.get(0);
+
+        assertThat(claim.path("verificationStatus").asString())
+                .isEqualTo("SUPPORTED");
+        assertThat(claim.path("reason").isNull()).isTrue();
+        assertThat(claim.path("evidences").size()).isEqualTo(1);
+        assertThat(claim.path("evidences").get(0)
+                .path("evidenceId").asLong()).isEqualTo(f.evidenceId());
     }
 
     private AuthResponse signup() {

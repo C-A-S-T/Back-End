@@ -51,7 +51,8 @@ public class ResearchResultService {
                 task.getCurrentStep(),
                 task.getPreviewSummary(),
                 isFinal ? answer.getAnswerContent() : null,
-                isFinal ? answer.getSummaryContent() : null
+                isFinal ? answer.getSummaryContent() : null,
+                task.getQuery().getQuestion()
         );
     }
 }

@@ -464,6 +464,39 @@ class SwaggerIntegrationTest extends TestDatabaseSupport {
                 .andExpect(status().isUnauthorized());
     }
 
+    @Test
+    void researchListSwaggerHasBearerAndTypedResponse() throws Exception {
+        JsonNode spec = spec();
+        JsonNode operation = spec.at("/paths/~1api~1research-tasks/get");
+
+        assertThat(operation.isMissingNode()).isFalse();
+        assertThat(operation.at("/security/0/bearerAuth").isArray()).isTrue();
+        assertThat(operation.at("/parameters").toString())
+                .contains("page", "size");
+
+        for (String code : new String[] {"200", "400", "401"}) {
+            assertThat(operation.at("/responses/" + code)
+                    .isMissingNode()).isFalse();
+        }
+
+        String schemaRef = operation.at(
+                "/responses/200/content/application~1json/schema/$ref"
+        ).asString();
+
+        assertThat(schemaRef).startsWith("#/components/schemas/");
+        assertThat(spec.at(schemaRef.substring(1))
+                .at("/properties/result/$ref").asString())
+                .isEqualTo("#/components/schemas/ResearchListResponse");
+
+        assertThat(spec.at(
+                "/components/schemas/ResearchResultResponse/properties/question"
+        ).isMissingNode()).isFalse();
+
+        assertThat(spec.at(
+                "/components/schemas/ClaimItem/properties/reason"
+        ).isMissingNode()).isFalse();
+    }
+
     private JsonNode spec() throws Exception {
 
         var result = mvc.perform(
