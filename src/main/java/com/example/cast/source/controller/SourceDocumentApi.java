@@ -4,6 +4,11 @@ import com.example.cast.auth.security.AuthenticatedUser;
 import com.example.cast.global.config.SwaggerConfig;
 import com.example.cast.global.response.ApiResponse;
 import com.example.cast.source.dto.response.SourceDocumentDetailResponse;
+import com.example.cast.source.dto.response.SourceMemoUpdateResponse;
+import com.example.cast.source.dto.request.SourceMemoUpdateRequest;
+import java.util.Map;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import com.example.cast.source.dto.response.SourceDocumentListResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -86,6 +91,7 @@ public interface SourceDocumentApi {
                     각 관련 목록은 최대 20건이며 전체 건수와 추가 존재 여부를 함께 제공합니다.
                     진행 중인 최초 관련 리서치는 포함할 수 있지만 그 밖의 관련 리서치는 완료된 작업만 반환합니다.
                     과거 검증 시도에서 스크랩한 문장은 검증 근거 목록에서 빠져도 스크랩 목록에 유지됩니다.
+                    사용자 개인 메모도 반환하며, 미작성 상태는 null입니다.
                     원문 전체, AI 문서 자체 요약 및 최신 버전 판정은 반환하지 않습니다.
                     originTaskId는 해당 문서를 최초 저장하게 된 연구 작업 ID이며 없으면 null입니다.
                     """,
@@ -122,6 +128,24 @@ public interface SourceDocumentApi {
             @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser user,
             @Parameter(description = "출처보관함 저장 기록 ID", example = "12")
             @PathVariable Long savedSourceId
+    );
+
+    @Operation(summary = "저장 문서 개인 메모 수정",
+            description = "소유자의 메모를 저장합니다. 최대 1000 UTF-16 코드 단위이며 null 또는 빈 문자열은 삭제입니다. memo 키 누락은 오류입니다.",
+            security = @SecurityRequirement(name = SwaggerConfig.JWT_SCHEME))
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "메모 수정 성공", useReturnTypeSchema = true),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청 값 오류"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "JWT 인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "존재하지 않거나 소유하지 않은 저장 기록")
+    })
+    @PatchMapping("/documents/{savedSourceId}/memo")
+    ResponseEntity<ApiResponse<SourceMemoUpdateResponse>> updateMemo(
+            @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser user,
+            @PathVariable Long savedSourceId,
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(required = true,
+                    content = @Content(schema = @Schema(implementation = SourceMemoUpdateRequest.class)))
+            @RequestBody Map<String, Object> body
     );
 
     String DOCUMENT_LIST_SUCCESS = """
@@ -175,6 +199,7 @@ public interface SourceDocumentApi {
                 "folderId": null,
                 "originTaskId": 7,
                 "savedAt": "2026-11-14T08:30:00Z",
+                "memo": null,
                 "verificationEvidences": [{
                   "evidenceId": 45,
                   "evidenceText": "월 최대 20만 원을 지원한다.",

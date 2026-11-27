@@ -8,6 +8,10 @@ import com.example.cast.policycompare.dto.response.PolicyComparisonResponse;
 import com.example.cast.policycompare.dto.response.PolicyComparisonResponse.ComparisonItem;
 import com.example.cast.policycompare.dto.response.PolicyComparisonResponse.EvidenceInfo;
 import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import com.example.cast.policycompare.dto.response.PolicyComparisonResponse.ResearchImpact;
+import com.example.cast.policycompare.dto.response.PolicyComparisonResponse.ChangeGroup;
 import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -29,7 +33,40 @@ public class PolicyComparisonService {
         }
         var response = client.fetchComparison(policyKey);
         validateComparison(policyKey, response);
-        return response;
+        // Derive from validated original items, not an independently trusted upstream summary.
+        // The old AI response may omit researchImpact during a rolling deployment.
+        ResearchImpact impact = buildImpact(response.items());
+        if (response.researchImpact() != null && !impact.equals(response.researchImpact())) {
+            invalidResponse();
+        }
+        return new PolicyComparisonResponse(response.policyKey(), response.policyTitle(),
+                response.previousDocumentKey(), response.currentDocumentKey(), response.reviewStatus(),
+                response.humanApproved(), response.javaImportReady(), response.sourceProvenanceVerified(),
+                response.warning(), response.totalItems(), response.items(), impact);
+    }
+
+    private ResearchImpact buildImpact(List<ComparisonItem> items) {
+        var primary = new LinkedHashMap<String, List<ComparisonItem>>();
+        var supporting = new LinkedHashMap<String, List<ComparisonItem>>();
+        for (ComparisonItem item : items) {
+            if (!"PRIMARY".equals(item.summaryRole()) || !isChangeCandidate(item)) continue;
+            if (isBlank(item.changeGroupId())) invalidResponse();
+            primary.computeIfAbsent(item.changeGroupId(), key -> new ArrayList<>()).add(item);
+        }
+        for (ComparisonItem item : items) {
+            if ("SUPPORTING".equals(item.summaryRole()) && isChangeCandidate(item)
+                    && primary.containsKey(item.changeGroupId())) {
+                supporting.computeIfAbsent(item.changeGroupId(), key -> new ArrayList<>()).add(item);
+            }
+        }
+        var groups = primary.entrySet().stream().map(entry -> new ChangeGroup(entry.getKey(),
+                List.copyOf(entry.getValue()), List.copyOf(supporting.getOrDefault(entry.getKey(), List.of())))).toList();
+        int count = groups.stream().mapToInt(group -> group.items().size()).sum();
+        return new ResearchImpact(count > 0, count, groups.size(), groups);
+    }
+
+    private boolean isChangeCandidate(ComparisonItem item) {
+        return "UPDATED".equals(item.proposedChangeType()) || "ADDED_CANDIDATE".equals(item.proposedChangeType());
     }
 
     private void validateComparison(String requestedKey, PolicyComparisonResponse result) {
