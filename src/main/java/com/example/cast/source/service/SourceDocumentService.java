@@ -1,6 +1,7 @@
 package com.example.cast.source.service;
 
 import com.example.cast.document.entity.SourceType;
+import com.example.cast.research.util.ResearchTitle;
 import com.example.cast.global.code.GlobalErrorCode;
 import com.example.cast.global.exception.BusinessException;
 import com.example.cast.source.dto.response.SourceDocumentDetailResponse;
@@ -109,7 +110,8 @@ public class SourceDocumentService {
                     scrap == null ? null : scrap.getScrapId());
         }).toList();
         var relatedItems = relatedSection.items().stream()
-                .map(row -> new RelatedResearchItem(row.taskId(), row.researchTitle(),
+                .map(row -> new RelatedResearchItem(row.taskId(),
+                        ResearchTitle.resolve(row.researchTitle(), row.question()),
                         row.question(), row.summaryContent(), row.completedAt()))
                 .toList();
         var scrapItems = scrapSection.items().stream().map(s -> {

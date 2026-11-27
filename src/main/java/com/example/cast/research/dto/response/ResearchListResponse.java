@@ -24,6 +24,8 @@ public record ResearchListResponse(
             Long taskId,
             String question,
             ResearchTaskStatus status,
-            Instant createdAt
+            Instant createdAt,
+            @Schema(description = "Research title")
+            String researchTitle
     ) {}
 }

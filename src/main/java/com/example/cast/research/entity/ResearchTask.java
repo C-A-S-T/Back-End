@@ -67,6 +67,7 @@ public class ResearchTask extends BaseTimeEntity {
         }
 
         this.status = ResearchTaskStatus.RUNNING;
+        this.currentStep = (short) 1;
         this.startedAt = OffsetDateTime.now(ZoneOffset.UTC);
     }
 
@@ -90,6 +91,7 @@ public class ResearchTask extends BaseTimeEntity {
         }
 
         this.status = ResearchTaskStatus.COMPLETED;
+        this.currentStep = (short) 6;
         this.completedAt = OffsetDateTime.now(ZoneOffset.UTC);
     }
 

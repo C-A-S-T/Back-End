@@ -6,6 +6,7 @@ import com.example.cast.research.dto.response.ResearchResultResponse;
 import com.example.cast.research.entity.Answer;
 import com.example.cast.research.entity.AnswerStatus;
 import com.example.cast.research.entity.ResearchTask;
+import com.example.cast.research.util.ResearchTitle;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -52,7 +53,10 @@ public class ResearchResultService {
                 task.getPreviewSummary(),
                 isFinal ? answer.getAnswerContent() : null,
                 isFinal ? answer.getSummaryContent() : null,
-                task.getQuery().getQuestion()
+                task.getQuery().getQuestion(),
+                ResearchTitle.resolve(
+                        task.getQuery().getResearchTitle(),
+                        task.getQuery().getQuestion())
         );
     }
 }
