@@ -16,7 +16,9 @@ public record ResearchEvidenceResponse(
             Integer claimIndex,
             String claimContent,
             VerificationStatus verificationStatus,
-            List<EvidenceItem> evidences
+            List<EvidenceItem> evidences,
+            @Schema(description = "Verification reason", nullable = true)
+            String reason
     ) {}
 
     public record EvidenceItem(

@@ -75,7 +75,7 @@ public class ResearchEvidenceService {
         if (latest.isEmpty()) {
             return new ResearchEvidenceResponse(taskId, claims.stream()
                     .map(c -> new ClaimItem(c.getClaimId(), c.getClaimIndex(), c.getClaimContent(),
-                            null, List.of())).toList());
+                            null, List.of(), null)).toList());
         }
 
         List<Long> verificationIds = latest.values().stream()
@@ -101,7 +101,7 @@ public class ResearchEvidenceService {
             Verification verification = latest.get(claim.getClaimId());
             if (verification == null) {
                 response.add(new ClaimItem(claim.getClaimId(), claim.getClaimIndex(),
-                        claim.getClaimContent(), null, List.of()));
+                        claim.getClaimContent(), null, List.of(), null));
                 continue;
             }
             List<EvidenceItem> items = byVerification
@@ -116,7 +116,8 @@ public class ResearchEvidenceService {
                                 scrap != null, scrap == null ? null : scrap.getScrapId());
                     }).toList();
             response.add(new ClaimItem(claim.getClaimId(), claim.getClaimIndex(),
-                    claim.getClaimContent(), verification.getStatus(), items));
+                    claim.getClaimContent(), verification.getStatus(), items,
+                    verification.getVerificationReason()));
         }
         return new ResearchEvidenceResponse(taskId, response);
     }
