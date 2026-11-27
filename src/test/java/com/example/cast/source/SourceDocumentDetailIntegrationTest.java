@@ -19,6 +19,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -300,6 +301,44 @@ class SourceDocumentDetailIntegrationTest extends TestDatabaseSupport {
     }
 
     private record LinkedEvidence(long taskId, long claimId, long evidenceId) { }
+
+    @Test
+    void memoCanBeSavedReplacedAndClearedByOwnerOnly() throws Exception {
+        var owner = signup();
+        var other = signup();
+        long documentId = newDocument("메모 테스트", false);
+        long id = save(owner.userId(), documentId, null, "MANUAL", null);
+        long otherId = save(other.userId(), documentId, null, "MANUAL", null);
+        String path = "/api/v1/sources/documents/{savedSourceId}/memo";
+        assertThat(detail(owner, id).path("memo").isNull()).isTrue();
+        for (String value : new String[]{"첫 메모", "가".repeat(1000), "수정한 메모"}) {
+            mvc.perform(patch(path, id).header("Authorization", bearer(owner))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(mapper.writeValueAsString(java.util.Map.of("memo", value))))
+                    .andExpect(status().isOk());
+            assertThat(detail(owner, id).path("memo").asString()).isEqualTo(value);
+        }
+        assertThat(detail(other, otherId).path("memo").isNull()).isTrue();
+        mvc.perform(patch(path, id).header("Authorization", bearer(other))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"memo\":\"no\"}"))
+                .andExpect(status().isNotFound());
+        mvc.perform(patch(path, id).contentType(MediaType.APPLICATION_JSON).content("{\"memo\":null}"))
+                .andExpect(status().isUnauthorized());
+        for (String invalid : new String[]{"{}", "{\"memo\":7}", "{\"memo\":[]}",
+                mapper.writeValueAsString(java.util.Map.of("memo", "x".repeat(1001)))}) {
+            mvc.perform(patch(path, id).header("Authorization", bearer(owner))
+                    .contentType(MediaType.APPLICATION_JSON).content(invalid)).andExpect(status().isBadRequest());
+        }
+        assertThat(detail(owner, id).path("memo").asString()).isEqualTo("수정한 메모");
+        for (String clear : new String[]{"{\"memo\":null}", "{\"memo\":\"\"}"}) {
+            mvc.perform(patch(path, id).header("Authorization", bearer(owner))
+                    .contentType(MediaType.APPLICATION_JSON).content("{\"memo\":\"again\"}"))
+                    .andExpect(status().isOk());
+            mvc.perform(patch(path, id).header("Authorization", bearer(owner))
+                    .contentType(MediaType.APPLICATION_JSON).content(clear)).andExpect(status().isOk());
+            assertThat(detail(owner, id).path("memo").isNull()).isTrue();
+        }
+    }
 
     private AuthResponse signup() {
         return auth.signup(new SignupRequest(

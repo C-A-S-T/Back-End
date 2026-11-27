@@ -63,7 +63,7 @@ class SwaggerIntegrationTest extends TestDatabaseSupport {
 
         JsonNode spec = spec();
 
-        assertThat(spec.get("paths").size()).isEqualTo(13);
+        assertThat(spec.get("paths").size()).isEqualTo(14);
         JsonNode researchOperation = spec.at("/paths/~1api~1research-tasks~1{taskId}/get");
         assertThat(researchOperation.isMissingNode()).isFalse();
         assertThat(researchOperation.at("/security/0/bearerAuth").isArray()).isTrue();
@@ -225,6 +225,18 @@ class SwaggerIntegrationTest extends TestDatabaseSupport {
         assertThat(spec.at(schemaRef.substring(1))
                 .at("/properties/result/$ref").asString())
                 .isEqualTo("#/components/schemas/PolicyChangeDetailResponse");
+    }
+
+    @Test
+    void memoSwaggerHasBearerAndResponseCodes() throws Exception {
+        JsonNode spec = spec();
+        JsonNode operation = spec.at("/paths/~1api~1v1~1sources~1documents~1{savedSourceId}~1memo/patch");
+        assertThat(operation.isMissingNode()).isFalse();
+        assertThat(operation.at("/security/0/bearerAuth").isArray()).isTrue();
+        for (String code : new String[]{"200", "400", "401", "404"}) {
+            assertThat(operation.at("/responses/" + code).isMissingNode()).isFalse();
+        }
+        assertThat(spec.at("/components/schemas/SourceDocumentDetailResponse/properties/memo").isMissingNode()).isFalse();
     }
 
     @Test

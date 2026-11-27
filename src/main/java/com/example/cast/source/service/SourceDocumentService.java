@@ -5,6 +5,8 @@ import com.example.cast.research.util.ResearchTitle;
 import com.example.cast.global.code.GlobalErrorCode;
 import com.example.cast.global.exception.BusinessException;
 import com.example.cast.source.dto.response.SourceDocumentDetailResponse;
+import com.example.cast.source.dto.response.SourceMemoUpdateResponse;
+import com.example.cast.source.dto.request.SourceMemoUpdateRequest;
 import com.example.cast.source.dto.response.SourceDocumentDetailResponse.VerificationEvidenceItem;
 import com.example.cast.source.dto.response.SourceDocumentDetailResponse.RelatedResearchItem;
 import com.example.cast.source.dto.response.SourceDocumentDetailResponse.ScrappedSentenceItem;
@@ -137,8 +139,21 @@ public class SourceDocumentService {
                 saved.getCreatedAt(),
                 evidenceItems, evidenceSection.totalCount(), evidenceSection.hasMore(),
                 relatedItems, relatedSection.totalCount(), relatedSection.hasMore(),
-                scrapItems, scrapSection.totalCount(), scrapSection.hasMore()
+                scrapItems, scrapSection.totalCount(), scrapSection.hasMore(), saved.getMemo()
         );
+    }
+
+    @Transactional
+    public SourceMemoUpdateResponse updateMemo(Long userId, Long savedSourceId,
+            SourceMemoUpdateRequest request) {
+        if (userId == null || userId <= 0 || savedSourceId == null || savedSourceId <= 0
+                || request == null || (request.memo() != null && request.memo().length() > 1000)) {
+            throw new BusinessException(GlobalErrorCode.INVALID_REQUEST);
+        }
+        SavedSource saved = documentRepository.findBySavedSourceIdAndUser_UserId(savedSourceId, userId)
+                .orElseThrow(() -> new BusinessException(GlobalErrorCode.NOT_FOUND));
+        saved.updateMemo(request.memo());
+        return new SourceMemoUpdateResponse(saved.getSavedSourceId(), saved.getMemo());
     }
 
     private DocumentItem toItem(SavedSource saved) {

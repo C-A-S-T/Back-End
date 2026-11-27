@@ -65,6 +65,16 @@ public class SavedSource extends BaseTimeEntity {
     )
     private SaveMethod saveMethod;
 
+    @Column(name = "memo", length = 1000)
+    private String memo;
+
+    public void updateMemo(String memo) {
+        if (memo != null && memo.length() > 1000) {
+            throw new IllegalArgumentException("Memo exceeds 1000 UTF-16 code units");
+        }
+        this.memo = memo == null || memo.isEmpty() ? null : memo;
+    }
+
     private SavedSource(
             User user,
             Document document,

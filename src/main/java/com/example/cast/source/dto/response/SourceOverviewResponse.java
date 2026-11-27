@@ -12,7 +12,7 @@ public record SourceOverviewResponse(
         long autoSavedDocumentCount,
         @Schema(description = "사용자의 근거 원문 스크랩 수", example = "0")
         Long scrappedSentenceCount,
-        @Schema(description = "정책 변경 추적 기능 구현 전까지 null 반환", nullable = true)
+        @Schema(description = "확정된 전체 정책 변경 기록 수. 미승인 AI 비교 결과 제외", example = "0")
         Long changedPolicyCount,
         @Schema(description = "사용자에게 존재하는 고정 카테고리 폴더 수", example = "3")
         int folderCount,

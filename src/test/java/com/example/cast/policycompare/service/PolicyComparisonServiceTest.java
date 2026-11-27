@@ -47,7 +47,8 @@ class PolicyComparisonServiceTest {
 
         var actual = service.getComparison(KEY);
 
-        assertThat(actual).isSameAs(comparison);
+        assertThat(actual.items()).isEqualTo(comparison.items());
+        assertThat(actual.researchImpact().significantChangeCount()).isZero();
         assertThat(actual.reviewStatus()).isEqualTo("REVIEW_REQUIRED");
         assertThat(actual.humanApproved()).isFalse();
         assertThat(actual.javaImportReady()).isFalse();
@@ -113,6 +114,41 @@ class PolicyComparisonServiceTest {
                 source.previousSourceType(), source.currentSourceType(),
                 List.of(invalid), source.currentEvidence());
         assertBadGateway(comparison(List.of(item), 1, false, false, false));
+    }
+
+    @Test
+    void impactGroupsPrimaryCandidatesAndKeepsSupportingEvidence() {
+        var a = candidate("a", "PRIMARY", "UPDATED", "group-a");
+        var b = candidate("b", "PRIMARY", "ADDED_CANDIDATE", "group-a");
+        var c = candidate("c", "SUPPORTING", "UPDATED", "group-a");
+        var d = candidate("d", "CONTEXT", "ANNUAL_SCHEDULE", "group-b");
+        var e = candidate("e", "PRIMARY", "UPDATED", "group-c");
+        var all = List.of(a, b, c, d, e);
+        when(client.fetchComparison(KEY)).thenReturn(comparison(all, 5, false, false, false));
+        var result = service.getComparison(KEY);
+        assertThat(result.items()).containsExactlyElementsOf(all);
+        assertThat(result.researchImpact().requiresRecheck()).isTrue();
+        assertThat(result.researchImpact().significantChangeCount()).isEqualTo(3);
+        assertThat(result.researchImpact().changeGroupCount()).isEqualTo(2);
+        assertThat(result.researchImpact().groups().getFirst().items()).containsExactly(a, b);
+        assertThat(result.researchImpact().groups().getFirst().supportingItems()).containsExactly(c);
+        assertThat(result.humanApproved()).isFalse();
+    }
+
+    @Test
+    void inconsistentUpstreamImpactIsRejected() {
+        var item = candidate("a", "PRIMARY", "UPDATED", "group-a");
+        var result = new PolicyComparisonResponse(KEY, "Youth rent support", PREVIOUS, CURRENT,
+                "REVIEW_REQUIRED", false, false, false, "Unapproved", 1, List.of(item),
+                new PolicyComparisonResponse.ResearchImpact(false, 0, 0, List.of()));
+        assertBadGateway(result);
+    }
+
+    private static ComparisonItem candidate(String id, String role, String type, String group) {
+        var source = item(id, PREVIOUS, CURRENT);
+        return new ComparisonItem(id, source.label(), source.scopeId(), type, source.reviewStatus(), role,
+                group, source.previousValue(), source.currentValue(), source.previousSourceType(),
+                source.currentSourceType(), source.previousEvidence(), source.currentEvidence());
     }
 
     private void assertBadGateway(PolicyComparisonResponse response) {

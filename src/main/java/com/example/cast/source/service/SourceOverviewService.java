@@ -31,7 +31,7 @@ public class SourceOverviewService {
                 counts.total(),
                 counts.automatic(),
                 scrapCount,
-                null, // Not available until policy-change persistence is implemented.
+                overviewRepository.countConfirmedPolicyChanges(),
                 folders.size(),
                 counts.unclassified(),
                 counts.legacyFolder(),
