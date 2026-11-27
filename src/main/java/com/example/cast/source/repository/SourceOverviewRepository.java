@@ -44,6 +44,11 @@ public class SourceOverviewRepository {
                 .getSingleResult()).longValue();
     }
 
+    public long countConfirmedPolicyChanges() {
+        return ((Number) em.createNativeQuery("SELECT COUNT(*) FROM backend.policy_change")
+                .getSingleResult()).longValue();
+    }
+
     public List<FolderCounts> countFixedFolders(long userId) {
         @SuppressWarnings("JpaQueryApiInspection") List<?> rows = em.createNativeQuery("""
                 SELECT f.folder_id, f.folder_category, f.folder_name,

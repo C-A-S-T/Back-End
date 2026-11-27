@@ -22,6 +22,8 @@ public interface PolicyComparisonApi {
                     JWT로 로그인한 사용자가 AI의 정책 비교 결과와 항목별 PDF 근거를 조회합니다.
                     현재 policyKey는 seoul-youth-rent만 지원합니다.
                     현재 제공되는 비교 결과는 REVIEW_REQUIRED 상태이며 확정된 정책 안내가 아닙니다.
+                    researchImpact는 주요 변경 후보와 보조 근거의 공통 안내이며 사용자별 판정이 아닙니다.
+                    기존 items의 전체 비교 및 미승인 상태는 유지됩니다.
                     DB 저장, AI 재실행, 승인 처리를 수행하지 않습니다.
                     """,
             security = @SecurityRequirement(name = SwaggerConfig.JWT_SCHEME))

@@ -4,6 +4,9 @@ import com.example.cast.auth.security.AuthenticatedUser;
 import com.example.cast.global.code.CommonSuccessCode;
 import com.example.cast.global.response.ApiResponse;
 import com.example.cast.source.dto.response.SourceDocumentDetailResponse;
+import com.example.cast.source.dto.response.SourceMemoUpdateResponse;
+import com.example.cast.source.dto.request.SourceMemoUpdateRequest;
+import java.util.Map;
 import com.example.cast.source.dto.response.SourceDocumentListResponse;
 import com.example.cast.source.service.SourceDocumentService;
 import lombok.RequiredArgsConstructor;
@@ -40,5 +43,13 @@ public class SourceDocumentController implements SourceDocumentApi {
     ) {
         return ApiResponse.success(CommonSuccessCode.OK,
                 documentService.getDocumentDetail(user.userId(), savedSourceId));
+    }
+
+    @Override
+    public ResponseEntity<ApiResponse<SourceMemoUpdateResponse>> updateMemo(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            Long savedSourceId, Map<String, Object> body) {
+        return ApiResponse.success(CommonSuccessCode.OK,
+                documentService.updateMemo(user.userId(), savedSourceId, SourceMemoUpdateRequest.from(body)));
     }
 }

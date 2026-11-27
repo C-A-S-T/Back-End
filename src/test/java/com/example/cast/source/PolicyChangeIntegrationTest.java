@@ -37,7 +37,7 @@ class PolicyChangeIntegrationTest extends TestDatabaseSupport {
     @Autowired ObjectMapper mapper;
 
     @Test
-    void noConfirmedMatchesReturnEmptyPageAndOverviewCountIsStillUnknown() throws Exception {
+    void noConfirmedMatchesReturnEmptyPageAndOverviewCountIsGlobal() throws Exception {
         var user = signup();
         var result = fetch(user, "missing-" + UUID.randomUUID(), null, 0, 20);
         assertThat(result.path("items").isArray()).isTrue();
@@ -49,7 +49,8 @@ class PolicyChangeIntegrationTest extends TestDatabaseSupport {
         var overview = mvc.perform(get("/api/v1/sources/overview")
                 .header("Authorization", bearer(user))).andExpect(status().isOk()).andReturn();
         assertThat(mapper.readTree(overview.getResponse().getContentAsByteArray())
-                .path("result").path("changedPolicyCount").isNull()).isTrue();
+                .path("result").path("changedPolicyCount").asLong()).isEqualTo(
+                jdbc.queryForObject("SELECT COUNT(*) FROM backend.policy_change", Long.class));
     }
 
     @Test
@@ -73,6 +74,11 @@ class PolicyChangeIntegrationTest extends TestDatabaseSupport {
             assertThat(item.path("category").asString()).isEqualTo("GOV_SUPPORT");
             assertThat(item.path("requiresRecheck").isNull()).isTrue();
             assertThat(item.path("impactSummary").isNull()).isTrue();
+            var overview = mvc.perform(get("/api/v1/sources/overview")
+                    .header("Authorization", bearer(account))).andExpect(status().isOk()).andReturn();
+            assertThat(mapper.readTree(overview.getResponse().getContentAsByteArray())
+                    .path("result").path("changedPolicyCount").asLong()).isEqualTo(
+                    jdbc.queryForObject("SELECT COUNT(*) FROM backend.policy_change", Long.class));
         }
     }
 

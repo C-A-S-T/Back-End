@@ -39,7 +39,8 @@ public record SourceDocumentDetailResponse(
         @Schema(description = "해당 문서에서 로그인 사용자가 스크랩한 문장(최대 20개)")
         List<ScrappedSentenceItem> scrappedSentences,
         @Schema(description = "해당 문서 스크랩 총 개수") long scrappedSentenceTotalCount,
-        @Schema(description = "스크랩 문장이 더 존재하는지 여부") boolean scrappedSentenceHasMore
+        @Schema(description = "스크랩 문장이 더 존재하는지 여부") boolean scrappedSentenceHasMore,
+        @Schema(description = "사용자 개인 메모", nullable = true, maxLength = 1000) String memo
 ) {
     public record VerificationEvidenceItem(
             Long evidenceId,

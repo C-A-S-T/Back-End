@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.ObjectMapper;
@@ -25,6 +26,7 @@ class SourceOverviewIntegrationTest extends TestDatabaseSupport {
     @Autowired MockMvc mvc;
     @Autowired AuthService auth;
     @Autowired ObjectMapper mapper;
+    @Autowired JdbcTemplate jdbc;
 
     @Test
     void newUserOverviewReturnsThreeEmptyFolders() throws Exception {
@@ -50,10 +52,12 @@ class SourceOverviewIntegrationTest extends TestDatabaseSupport {
         assertThat(result.path("legacyFolderDocumentCount").asLong()).isZero();
         assertThat(result.path("folderCount").asInt()).isEqualTo(3);
 
-        // 스크랩 기능은 지원하고, 미구현 정책 변경 집계만 null로 남긴다.
+        // 확정 정책 변경은 전체 사용자에게 공통으로 집계된다.
         assertThat(result.path("scrappedSentenceCount").asLong()).isZero();
         assertThat(result.has("changedPolicyCount")).isTrue();
-        assertThat(result.get("changedPolicyCount").isNull()).isTrue();
+        assertThat(result.get("changedPolicyCount").isIntegralNumber()).isTrue();
+        assertThat(result.path("changedPolicyCount").asLong()).isEqualTo(
+                jdbc.queryForObject("SELECT COUNT(*) FROM backend.policy_change", Long.class));
 
         var folders = result.path("folders");
         assertThat(folders.isArray()).isTrue();
