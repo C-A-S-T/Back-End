@@ -11,6 +11,7 @@ public record ResearchResultResponse(
         String previewSummary,
         String answer,
         String summary,
-        @Schema(description = "Original research question") String question
+        @Schema(description = "Original research question") String question,
+        @Schema(description = "Research title") String researchTitle
 ) {
 }

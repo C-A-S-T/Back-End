@@ -143,6 +143,7 @@ class SourceDocumentDetailIntegrationTest extends TestDatabaseSupport {
         JsonNode research = result.path("relatedResearches").get(0);
         assertThat(research.path("taskId").asLong()).isEqualTo(linked.taskId());
         assertThat(research.path("question").asString()).isEqualTo("테스트 연구 질문");
+        assertThat(research.path("researchTitle").asString()).isEqualTo("연관 리서치");
         assertThat(research.path("summaryContent").asString()).isEqualTo("최종 답변 요약");
         assertThat(research.path("completedAt").asString()).isNotBlank();
 
@@ -247,6 +248,15 @@ class SourceDocumentDetailIntegrationTest extends TestDatabaseSupport {
         assertThat(result.path("relatedResearches").get(0).path("taskId").asLong())
                 .isEqualTo(taskId);
         assertThat(result.path("relatedResearches").get(0).path("completedAt").isNull()).isTrue();
+        assertThat(result.path("relatedResearches").get(0)
+                .path("researchTitle").asString())
+                .isEqualTo("테스트 연구 질문");
+        assertThat(jdbc.queryForObject("""
+                SELECT q.research_title
+                FROM backend.research_query q
+                JOIN backend.research_task t ON t.query_id = q.query_id
+                WHERE t.task_id = ?
+                """, String.class, taskId)).isNull();
         assertThat(result.path("verificationEvidenceTotalCount").asLong()).isZero();
     }
 

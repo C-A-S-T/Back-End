@@ -493,6 +493,18 @@ class SwaggerIntegrationTest extends TestDatabaseSupport {
         ).isMissingNode()).isFalse();
 
         assertThat(spec.at(
+                "/components/schemas/ResearchResultResponse/properties/researchTitle/type"
+        ).asText()).isEqualTo("string");
+
+        String itemRef = spec.at(
+                "/components/schemas/ResearchListResponse/properties/items/items/$ref"
+        ).asText();
+        assertThat(itemRef).startsWith("#/components/schemas/");
+        assertThat(spec.at(itemRef.substring(1))
+                .at("/properties/researchTitle/type").asText())
+                .isEqualTo("string");
+
+        assertThat(spec.at(
                 "/components/schemas/ClaimItem/properties/reason"
         ).isMissingNode()).isFalse();
     }

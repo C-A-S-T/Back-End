@@ -5,6 +5,7 @@ import com.example.cast.global.exception.BusinessException;
 import com.example.cast.research.dto.response.ResearchListResponse;
 import com.example.cast.research.dto.response.ResearchListResponse.ResearchItem;
 import com.example.cast.research.repository.ResearchTaskRepository;
+import com.example.cast.research.util.ResearchTitle;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -34,7 +35,10 @@ public class ResearchListService {
                         task.getTaskId(),
                         task.getQuery().getQuestion(),
                         task.getStatus(),
-                        task.getCreatedAt()
+                        task.getCreatedAt(),
+                        ResearchTitle.resolve(
+                                task.getQuery().getResearchTitle(),
+                                task.getQuery().getQuestion())
                 )).toList();
 
         return new ResearchListResponse(

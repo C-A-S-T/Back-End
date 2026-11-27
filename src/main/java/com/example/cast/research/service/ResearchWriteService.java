@@ -1,5 +1,6 @@
 package com.example.cast.research.service;
 import com.example.cast.research.entity.*;
+import com.example.cast.research.util.ResearchTitle;
 import com.example.cast.research.dto.request.ResearchInputs;
 import com.example.cast.global.validation.RequestValidator;
 import com.example.cast.global.exception.BusinessException;
@@ -19,6 +20,7 @@ public class ResearchWriteService {
     public ResearchQuery createQuery(Long userId, ResearchInputs.Query input) {
         validator.validate(input);
         ResearchQuery query = new ResearchQuery(find(com.example.cast.user.entity.User.class, userId), input.question());
+        query.updateResearchTitle(ResearchTitle.fromQuestion(input.question()));
         em.persist(query); return query;
     }
     @Transactional
